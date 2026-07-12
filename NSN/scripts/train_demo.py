@@ -12,6 +12,7 @@ import torch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from leaf_softmax import LeafSoftmaxMode  # noqa: E402
 from model import DNNEML  # noqa: E402
 from snap import (  # noqa: E402
     apply_hardening,
@@ -57,6 +58,12 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--head-depth", type=int, default=2)
+    parser.add_argument(
+        "--leaf-softmax",
+        choices=["softmax", "gumbel"],
+        default="softmax",
+        help="Leaf weight mode for EML head (gumbel-softmax vs plain softmax).",
+    )
     args = parser.parse_args()
 
     set_seed(args.seed)
@@ -71,6 +78,7 @@ def main() -> None:
         head_depth=cfg["head_depth"],
         hidden_dim=cfg["hidden_dim"],
         num_layers=3,
+        leaf_softmax_mode=LeafSoftmaxMode.parse(args.leaf_softmax),
     )
     opt_cls = torch.optim.AdamW if cfg["optimizer"] == "adamw" else torch.optim.Adam
     opt = opt_cls(model.parameters(), lr=cfg["lr"])
@@ -98,6 +106,7 @@ def main() -> None:
     log_path = out_dir / "train_log.txt"
     with log_path.open("w", encoding="utf-8") as f:
         f.write(f"demo={args.demo}\n")
+        f.write(f"leaf_softmax={args.leaf_softmax}\n")
         if args.demo == "feynman":
             f.write(f"target={FEYNMAN_DEMO_ID}\n")
             f.write(f"formula={TARGETS[FEYNMAN_DEMO_ID].formula}\n")

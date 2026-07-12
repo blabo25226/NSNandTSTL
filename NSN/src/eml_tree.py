@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from eml import EMLNode
+from leaf_softmax import LeafSoftmaxMode, leaf_weights
 from utils import as_complex, real_out
 
 
@@ -24,6 +25,7 @@ class EMLTreeHead(nn.Module):
         depth: int = 2,
         temperature: float = 1.0,
         f_prev: float = 0.0,
+        leaf_softmax_mode: LeafSoftmaxMode | str = LeafSoftmaxMode.SOFTMAX,
     ) -> None:
         super().__init__()
         if depth < 1 or depth > 4:
@@ -33,6 +35,11 @@ class EMLTreeHead(nn.Module):
         self.depth = depth
         self.temperature = temperature
         self.f_prev_const = f_prev
+        self.leaf_softmax_mode = (
+            mode if isinstance(mode := leaf_softmax_mode, LeafSoftmaxMode)
+            else LeafSoftmaxMode.parse(leaf_softmax_mode)
+        )
+        self.gumbel_generator: torch.Generator | None = None
 
         self.num_leaves = 2**depth
         self.num_internal = self.num_leaves - 1
@@ -81,7 +88,13 @@ class EMLTreeHead(nn.Module):
             z = z.unsqueeze(0)
         batch = z.shape[0]
 
-        weights = F.softmax(self.leaf_logits / self.temperature, dim=-1)
+        weights = leaf_weights(
+            self.leaf_logits,
+            self.temperature,
+            self.leaf_softmax_mode,
+            training=self.training,
+            generator=self.gumbel_generator,
+        )
         w_alpha = weights[..., 0]
         w_beta = weights[..., 1]
         w_gamma = weights[..., 2]

@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 
 from eml_tree import EMLTreeHead
+from leaf_softmax import LeafSoftmaxMode
 from trunk import MLPTrunk
 
 
@@ -34,7 +35,13 @@ class DNNEML(nn.Module):
         num_layers: int = 3,
         activation: str = "relu",
         concat_input: bool = False,
+        leaf_softmax_mode: LeafSoftmaxMode | str = LeafSoftmaxMode.SOFTMAX,
     ) -> "DNNEML":
+        mode = (
+            leaf_softmax_mode
+            if isinstance(leaf_softmax_mode, LeafSoftmaxMode)
+            else LeafSoftmaxMode.parse(leaf_softmax_mode)
+        )
         if concat_input:
             trunk_out = max(2, feature_dim - input_dim)
             head_dim = input_dim + trunk_out
@@ -45,7 +52,9 @@ class DNNEML(nn.Module):
                 num_layers=num_layers,
                 activation=activation,
             )
-            head = EMLTreeHead(feature_dim=head_dim, depth=head_depth)
+            head = EMLTreeHead(
+                feature_dim=head_dim, depth=head_depth, leaf_softmax_mode=mode
+            )
             return cls(trunk, head, concat_input=True)
         trunk = MLPTrunk(
             input_dim=input_dim,
@@ -54,7 +63,9 @@ class DNNEML(nn.Module):
             num_layers=num_layers,
             activation=activation,
         )
-        head = EMLTreeHead(feature_dim=feature_dim, depth=head_depth)
+        head = EMLTreeHead(
+            feature_dim=feature_dim, depth=head_depth, leaf_softmax_mode=mode
+        )
         return cls(trunk, head, concat_input=False)
 
     def mse_loss(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:

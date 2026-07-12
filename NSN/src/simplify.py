@@ -40,7 +40,14 @@ def _try_simplify_eml_once(expr: str) -> str | None:
     if m:
         return f"exp({m.group(1)})"
 
-    # eml(1, eml(eml(1, z), 1)) -> ln(z)  (exact nested pattern)
+    # eml(0, z) -> (1 - ln(z)) on positive reals
+    m = re.fullmatch(r"eml\(0, (.+)\)", expr.strip())
+    if m:
+        return f"(1 - ln({m.group(1)}))"
+
+    # eml(1, 1) -> e
+    if expr.strip() == "eml(1, 1)":
+        return "e"
     m = re.fullmatch(r"eml\(1, eml\(eml\(1, (.+)\), 1\)\)", expr.strip())
     if m:
         return f"ln({m.group(1)})"

@@ -44,3 +44,8 @@
 
 - **作業内容**: `train_demo.py` に Feynman 1式デモ（`--demo feynman`, I.29 系 `x0*x1`）を追加。overfit（train=test、ノイズなし）。
 - **変更ファイル**: `NSN/scripts/train_demo.py`, `NSN/daily_report.md`
+
+## 2026-07-13 01:40
+
+- **作業内容**: Gumbel-softmax / softmax 切替（`leaf_softmax.py`, `--leaf-softmax`）。Odrzywołek 理論モジュール（`odrzywolek.py`）と 4 段パイプライン（`pipeline.py`: SEARCH→HARDEN→POLISH→SNAP）を実装。`trainer.py` はパイプライン経由に統一。pytest 35 件 PASS。
+- **変更ファイル**: `NSN/src/leaf_softmax.py`, `odrzywolek.py`, `pipeline.py`, `eml_tree.py`, `model.py`, `trainer.py`, `simplify.py`, `scripts/sr_eval.py`, `train_demo.py`, `verify_odrzywolek.py`, `tests/test_*.py`, `NSN/daily_report.md`

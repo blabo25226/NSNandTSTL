@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import copy
 from dataclasses import dataclass
 
 import torch
 
+from leaf_softmax import LeafSoftmaxMode
 from model import DNNEML
-from snap import apply_hardening, apply_snap_to_logits, export_symbolic_expression
+from pipeline import OdrzywolekPipelineConfig, run_odrzywolek_pipeline
 from targets import DEFAULT_NOISE_STD_REL, SRTarget
 from utils import set_seed
 
@@ -25,6 +25,9 @@ class TrainConfig:
     n_train: int = 256
     noise_std_rel: float = DEFAULT_NOISE_STD_REL
     weight_decay: float = 1e-4
+    leaf_softmax_mode: LeafSoftmaxMode | str = LeafSoftmaxMode.SOFTMAX
+    use_odrzywolek_pipeline: bool = True
+    polish_lr: float = 1e-4
 
 
 @dataclass
@@ -34,9 +37,14 @@ class TrainResult:
     initial_mse: float
     best_val_mse: float
     expression_eml: str
+    simplified: str | None
     steps: int
     train_seconds: float
     stopped_step: int
+    pipeline_search_steps: int = 0
+    pipeline_harden_steps: int = 0
+    pipeline_polish_steps: int = 0
+    leaf_softmax_mode: str = "softmax"
 
 
 def _config_for_target(target: SRTarget, base: TrainConfig) -> TrainConfig:
@@ -85,11 +93,18 @@ def _config_for_target(target: SRTarget, base: TrainConfig) -> TrainConfig:
     return cfg
 
 
+def _parse_leaf_mode(mode: LeafSoftmaxMode | str) -> LeafSoftmaxMode:
+    if isinstance(mode, LeafSoftmaxMode):
+        return mode
+    return LeafSoftmaxMode.parse(mode)
+
+
 def train_target(target: SRTarget, base_config: TrainConfig | None = None) -> tuple[DNNEML, TrainResult]:
     import time
 
     t0 = time.perf_counter()
     cfg = _config_for_target(target, base_config or TrainConfig())
+    leaf_mode = _parse_leaf_mode(cfg.leaf_softmax_mode)
     set_seed(cfg.seed)
     gen = torch.Generator().manual_seed(cfg.seed)
     x, y = target.sample(cfg.n_train, gen, cfg.noise_std_rel)
@@ -100,37 +115,35 @@ def train_target(target: SRTarget, base_config: TrainConfig | None = None) -> tu
         head_depth=cfg.head_depth,
         hidden_dim=cfg.hidden_dim,
         num_layers=cfg.num_layers,
+        leaf_softmax_mode=leaf_mode,
     )
-    opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
-    losses: list[float] = []
-    for step in range(1, cfg.steps + 1):
-        apply_hardening(model.head, step, cfg.steps)
-        opt.zero_grad()
-        loss = model.mse_loss(x, y)
-        if not torch.isfinite(loss):
-            raise RuntimeError(f"NaN loss for {target.id} at step {step}")
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        opt.step()
-        losses.append(loss.item())
+    if cfg.use_odrzywolek_pipeline:
+        pipe_cfg = OdrzywolekPipelineConfig(
+            total_steps=cfg.steps,
+            lr=cfg.lr,
+            polish_lr=cfg.polish_lr,
+            weight_decay=cfg.weight_decay,
+            leaf_softmax_mode=leaf_mode,
+            seed=cfg.seed,
+        )
+        pipe = run_odrzywolek_pipeline(model, x, y, pipe_cfg)
+        elapsed = time.perf_counter() - t0
+        result = TrainResult(
+            target_id=target.id,
+            final_mse=pipe.final_mse,
+            initial_mse=pipe.initial_mse,
+            best_val_mse=pipe.final_mse,
+            expression_eml=pipe.expression_eml,
+            simplified=pipe.simplified,
+            steps=cfg.steps,
+            train_seconds=elapsed,
+            stopped_step=cfg.steps,
+            pipeline_search_steps=pipe.search_steps,
+            pipeline_harden_steps=pipe.harden_steps,
+            pipeline_polish_steps=pipe.polish_steps,
+            leaf_softmax_mode=leaf_mode.value,
+        )
+        return model, result
 
-    soft_state = copy.deepcopy(model.state_dict())
-    apply_snap_to_logits(model.head)
-    z_names = [f"z{i}" for i in range(model.head.feature_dim)]
-    expr = export_symbolic_expression(model.head, z_names)
-    # Restore soft weights: hard snap helps symbolic export but hurts holdout accuracy.
-    model.load_state_dict(soft_state)
-
-    elapsed = time.perf_counter() - t0
-    result = TrainResult(
-        target_id=target.id,
-        final_mse=losses[-1],
-        initial_mse=losses[0],
-        best_val_mse=losses[-1],
-        expression_eml=expr,
-        steps=cfg.steps,
-        train_seconds=elapsed,
-        stopped_step=cfg.steps,
-    )
-    return model, result
+    raise RuntimeError("Legacy training loop removed; use Odrzywołek pipeline.")

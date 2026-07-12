@@ -59,11 +59,18 @@ def main() -> None:
         default=DEFAULT_NOISE_STD_REL,
         help="Label noise: y += N(0, (noise_std_rel * std(y))^2). 0 = noiseless.",
     )
+    parser.add_argument(
+        "--leaf-softmax",
+        choices=["softmax", "gumbel"],
+        default="softmax",
+        help="Leaf weight sampling during SEARCH/HARDEN (gumbel adds stochastic exploration).",
+    )
     args = parser.parse_args()
 
     mse_strict = args.mse_strict
     mse_relaxed = args.mse_relaxed
     noise_std_rel = args.noise_std_rel
+    leaf_softmax = args.leaf_softmax
 
     ids = phase_targets(args.phase)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -85,7 +92,12 @@ def main() -> None:
         print(f"\n[{tid}] true={target.formula} monotonic={target.monotonic} thr={thr:.2e}")
 
         model, tr = train_target(
-            target, TrainConfig(seed=args.seed, noise_std_rel=noise_std_rel)
+            target,
+            TrainConfig(
+                seed=args.seed,
+                noise_std_rel=noise_std_rel,
+                leaf_softmax_mode=leaf_softmax,
+            ),
         )
         total_train_sec += tr.train_seconds
         gen = torch.Generator().manual_seed(args.seed + 1)
@@ -137,6 +149,7 @@ def main() -> None:
         "phase": args.phase,
         "seed": args.seed,
         "noise_std_rel": noise_std_rel,
+        "leaf_softmax": leaf_softmax,
         "total_train_seconds": total_train_sec,
         "total_wall_seconds": phase_elapsed,
         "numeric_success": sum(1 for r in rows if r["numeric_ok"]),

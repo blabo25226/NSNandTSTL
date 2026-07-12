@@ -49,3 +49,14 @@
 
 - **作業内容**: Gumbel-softmax / softmax 切替（`leaf_softmax.py`, `--leaf-softmax`）。Odrzywołek 理論モジュール（`odrzywolek.py`）と 4 段パイプライン（`pipeline.py`: SEARCH→HARDEN→POLISH→SNAP）を実装。`trainer.py` はパイプライン経由に統一。pytest 35 件 PASS。
 - **変更ファイル**: `NSN/src/leaf_softmax.py`, `odrzywolek.py`, `pipeline.py`, `eml_tree.py`, `model.py`, `trainer.py`, `simplify.py`, `scripts/sr_eval.py`, `train_demo.py`, `verify_odrzywolek.py`, `tests/test_*.py`, `NSN/daily_report.md`
+
+## 2026-07-13 02:05
+
+- **作業内容**: 論文突き合わせ評価で判明した課題を優先順に改修。
+  - **(1) スナップ後 MSE の実測**: `snap.evaluate_snapped()`（葉を one-hot 固定→評価→ソフト重み復元）を追加。pipeline が `snapped_train_mse` を返し `TrainResult` に伝播。
+  - **(2) symbolic_ok の再定義**: 旧定義（ソフトモデルのテンプレート照合）を廃し、**export した閉形式=スナップ済みモデルの holdout MSE ≤ 閾値**を成功条件に。`sr_eval` に `snapped_holdout_mse`・`snap_degrade` 列を追加。`match_elementary_template` はスナップ済み予測を受け取る形に変更。
+  - **(3) f_prev 再帰（式9）**: `EMLTreeHead(f_prev_mode=...)` を追加。`zero`（既定・v1）と `parent`（1 ステップ top-down 帰還）。`DNNEML.build` に伝播。テスト 2 件追加。
+  - **(4) head-capacity 実験**: pipeline に `freeze_trunk_after_search` を追加。`scripts/head_capacity_eval.py`（full/small/freeze/small+parent 比較、soft vs snapped MSE 出力）を新規作成。短ステップ実行で snap 劣化 x2.9〜x13000 を確認（＝現状 trunk 主導を定量化）。
+  - **(5) ドキュメント**: `texts/SR検証計画.md` に symbolic 再定義・設計判断（Eq9 softmax 解釈, f_prev, head-capacity, Feynman 合成代替）を追記。
+- **変更ファイル**: `NSN/src/snap.py`, `pipeline.py`, `trainer.py`, `simplify.py`, `eml_tree.py`, `model.py`, `scripts/sr_eval.py`, `scripts/head_capacity_eval.py`, `tests/test_eml_tree.py`, `texts/SR検証計画.md`, `NSN/daily_report.md`
+- **メモ**: pytest 37 件 PASS。Feynman DB 実データ×深さ{2,3,4}×EQL/KAN 比較は計算時間が長いため別途まとめて実施予定。次: `sr_eval.py` を再実行し新 symbolic 定義での成功率を測る。

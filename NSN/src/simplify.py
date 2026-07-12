@@ -10,6 +10,7 @@ from typing import Callable
 import torch
 
 from model import DNNEML
+from snap import evaluate_snapped
 
 
 @dataclass
@@ -19,6 +20,7 @@ class SimplifyResult:
     template_guess: str | None
     template_mse: float | None
     symbolic_ok: bool
+    snapped_mse: float | None = None
 
 
 # Canonical elementary templates (ground-truth families for evaluation).
@@ -81,21 +83,22 @@ def simplify_eml_expression(expr: str, max_passes: int = 12) -> str:
 
 
 def match_elementary_template(
-    model: DNNEML,
+    pred: torch.Tensor,
     x: torch.Tensor,
     y_true: torch.Tensor,
     true_formula: str,
     mse_threshold: float = 1e-2,
 ) -> tuple[str | None, float, float]:
     """
-    Pick template that best matches model predictions.
+    Pick template that best matches the given predictions.
+
+    `pred` should be the *snapped* (exported closed-form) output so the guess
+    reflects the recovered symbolic expression, not the soft black-box model.
 
     Returns (best_template_name, mse_pred_vs_template, mse_template_vs_truth).
   """
-    with torch.no_grad():
-        pred = model(x)
-        if pred.dim() == 0:
-            pred = pred.unsqueeze(0)
+    if pred.dim() == 0:
+        pred = pred.unsqueeze(0)
 
     best_name: str | None = None
     best_mse = float("inf")
@@ -125,12 +128,23 @@ def evaluate_symbolic(
     mse_threshold: float = 1e-2,
     numeric_ok: bool = False,
 ) -> SimplifyResult:
+    """
+    Assess the *exported* closed-form EML expression.
+
+    `symbolic_ok` now means the snapped expression is numerically faithful:
+    its holdout MSE is within `mse_threshold`. This measures the paper's
+    snapping-success claim directly, rather than template-matching the soft
+    black-box model. The template guess is retained as auxiliary information and
+    is computed on the snapped output.
+    """
     simplified = simplify_eml_expression(eml_expr)
+
+    snapped_mse, snapped_pred = evaluate_snapped(model, x, y_true)
     guess, tmpl_mse, _ = match_elementary_template(
-        model, x, y_true, true_formula, mse_threshold
+        snapped_pred, x, y_true, true_formula, mse_threshold
     )
 
-    symbolic_ok = numeric_ok and (guess == true_formula)
+    symbolic_ok = snapped_mse <= mse_threshold
 
     simp_out = simplified if simplified != eml_expr.replace("Re[", "").replace("]", "") else None
     return SimplifyResult(
@@ -139,4 +153,5 @@ def evaluate_symbolic(
         template_guess=guess,
         template_mse=tmpl_mse,
         symbolic_ok=symbolic_ok,
+        snapped_mse=snapped_mse,
     )

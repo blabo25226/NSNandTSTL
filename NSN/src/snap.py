@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING
 
 import torch
@@ -9,6 +10,7 @@ import torch.nn.functional as F
 
 if TYPE_CHECKING:
     from eml_tree import EMLTreeHead
+    from model import DNNEML
 
 
 def temperature_schedule(
@@ -56,6 +58,36 @@ def apply_snap_to_logits(head: "EMLTreeHead", strength: float = 20.0) -> None:
     with torch.no_grad():
         hard = snap_leaf_weights(head)
         head.leaf_logits.copy_(hard * strength)
+
+
+def evaluate_snapped(
+    model: "DNNEML",
+    x: torch.Tensor,
+    y: torch.Tensor,
+) -> tuple[float, torch.Tensor]:
+    """
+    MSE of the *snapped* model, i.e. the numerical realisation of the exported
+    closed-form EML expression (paper Sec. 4.2).
+
+    The snapped model sets each leaf's logits to a one-hot argmax, so its output
+    equals `export_symbolic_expression(...)` evaluated on z = trunk(x). Soft
+    weights are restored before returning, so the caller's model is unchanged.
+
+    Returns (snapped_mse, snapped_predictions).
+    """
+    soft_state = copy.deepcopy(model.state_dict())
+    was_training = model.training
+    model.eval()
+    apply_snap_to_logits(model.head)
+    with torch.no_grad():
+        pred = model(x)
+        if pred.dim() == 0:
+            pred = pred.unsqueeze(0)
+        y_ref = y.unsqueeze(0) if y.dim() == 0 else y
+        mse = torch.mean((pred - y_ref) ** 2).item()
+    model.load_state_dict(soft_state)
+    model.train(was_training)
+    return mse, pred.detach()
 
 
 def _leaf_symbol_snapped(head: "EMLTreeHead", leaf_index: int, z_names: list[str]) -> str:

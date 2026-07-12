@@ -45,6 +45,7 @@ class TrainResult:
     pipeline_harden_steps: int = 0
     pipeline_polish_steps: int = 0
     leaf_softmax_mode: str = "softmax"
+    snapped_train_mse: float = float("nan")
 
 
 def _config_for_target(target: SRTarget, base: TrainConfig) -> TrainConfig:
@@ -143,6 +144,7 @@ def train_target(target: SRTarget, base_config: TrainConfig | None = None) -> tu
             pipeline_harden_steps=pipe.harden_steps,
             pipeline_polish_steps=pipe.polish_steps,
             leaf_softmax_mode=leaf_mode.value,
+            snapped_train_mse=pipe.snapped_train_mse,
         )
         return model, result
 

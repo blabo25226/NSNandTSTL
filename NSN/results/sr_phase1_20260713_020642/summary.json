@@ -1,0 +1,33 @@
+{
+  "phase": 1,
+  "seed": 42,
+  "noise_std_rel": 0.01,
+  "leaf_softmax": "softmax",
+  "total_train_seconds": 34.929183000000194,
+  "total_wall_seconds": 34.935517599995364,
+  "numeric_success": 0,
+  "symbolic_success": 0,
+  "total": 1,
+  "results": [
+    {
+      "target_id": "sin_plus",
+      "true_formula": "sin(x0) + x1",
+      "monotonic": false,
+      "final_train_mse": 0.0014492626069113612,
+      "holdout_mse": 0.07515683770179749,
+      "snapped_holdout_mse": 0.1279507577419281,
+      "snap_degrade_ratio": 1.7024499919701648,
+      "mse_threshold": 0.05,
+      "numeric_ok": false,
+      "symbolic_ok": false,
+      "template_guess": "sin(x0) + x1",
+      "template_mse": 0.12938404083251953,
+      "eml_expression": "Re[eml(eml((0.230761*z0 + -0.0759252*z1 + 0.116289*z2 + -0.121802*z3 + -0.0578561*z4 + -0.313266*z5 + -0.476631*z6 + -0.384069*z7), (0.449714*z0 + 0.29047*z1 + 0.431243*z2 + -0.355652*z3 + -0.411052*z4 + -0.463419*z5 + -0.45933*z6 + -0.457146*z7)), eml((0.197319*z0 + -0.0661581*z1 + 0.172429*z2 + -0.154098*z3 + -0.156461*z4 + -0.202971*z5 + -0.218016*z6 + -0.206726*z7), (-0.0825604*z0 + 0.406068*z1 + -0.118423*z2 + 0.133105*z3 + 0.106751*z4 + 0.135118*z5 + 0.126246*z6 + 0.128268*z7)))]",
+      "simplified": null,
+      "steps": 6000,
+      "train_seconds": 34.929183000000194,
+      "best_val_mse": 0.0014492626069113612,
+      "stopped_step": 6000
+    }
+  ]
+}

@@ -72,3 +72,28 @@ def test_forward_no_nan():
     z = torch.randn(8, 4)
     out = head(z)
     assert torch.isfinite(out).all()
+
+
+def test_f_prev_parent_mode_changes_output():
+    """Parent-feedback mode injects gamma*f_prev, differing from zero mode."""
+    torch.manual_seed(3)
+    zero = EMLTreeHead(feature_dim=3, depth=2, f_prev_mode="zero")
+    parent = EMLTreeHead(feature_dim=3, depth=2, f_prev_mode="parent")
+    parent.load_state_dict(zero.state_dict())  # identical weights
+    # Force non-trivial gamma weight so the f_prev term matters.
+    with torch.no_grad():
+        zero.leaf_logits.fill_(0.0)
+        parent.leaf_logits.fill_(0.0)
+    z = torch.randn(6, 3)
+    out_zero = zero(z)
+    out_parent = parent(z)
+    assert out_zero.shape == out_parent.shape
+    assert torch.isfinite(out_parent).all()
+    assert not torch.allclose(out_zero, out_parent, atol=1e-4)
+
+
+def test_f_prev_mode_validation():
+    import pytest
+
+    with pytest.raises(ValueError):
+        EMLTreeHead(feature_dim=2, depth=2, f_prev_mode="bogus")

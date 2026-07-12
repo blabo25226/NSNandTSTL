@@ -11,7 +11,12 @@ import torch.nn.functional as F
 from leaf_softmax import LeafSoftmaxMode
 from model import DNNEML
 from simplify import simplify_eml_expression
-from snap import apply_snap_to_logits, export_symbolic_expression, temperature_schedule
+from snap import (
+    apply_snap_to_logits,
+    evaluate_snapped,
+    export_symbolic_expression,
+    temperature_schedule,
+)
 
 
 @dataclass
@@ -28,6 +33,9 @@ class OdrzywolekPipelineConfig:
     leaf_softmax_mode: LeafSoftmaxMode = LeafSoftmaxMode.SOFTMAX
     harden_end_temp: float = 0.1
     seed: int = 42
+    # Head-capacity study: freeze the trunk after SEARCH so the EML head must
+    # carry the symbolic load during HARDEN/POLISH instead of the black-box MLP.
+    freeze_trunk_after_search: bool = False
 
 
 @dataclass
@@ -47,6 +55,7 @@ class PipelineResult:
     search_steps: int
     harden_steps: int
     polish_steps: int
+    snapped_train_mse: float = float("nan")
 
 
 def _resolve_stage_lengths(cfg: OdrzywolekPipelineConfig) -> tuple[int, int, int]:
@@ -102,6 +111,15 @@ def run_odrzywolek_pipeline(
         model.train()
         stages.search_losses.append(_train_step(model, x, y, opt))
 
+    if cfg.freeze_trunk_after_search:
+        for p in model.trunk.parameters():
+            p.requires_grad_(False)
+        opt = torch.optim.AdamW(
+            [p for p in model.parameters() if p.requires_grad],
+            lr=cfg.lr,
+            weight_decay=cfg.weight_decay,
+        )
+
     # --- HARDEN ---
     for step in range(1, harden_n + 1):
         temp = temperature_schedule(
@@ -113,7 +131,10 @@ def run_odrzywolek_pipeline(
 
     # --- POLISH ---
     head.leaf_logits.requires_grad_(False)
-    polish_params = [p for n, p in model.named_parameters() if "leaf_logits" not in n]
+    polish_params = [
+        p for n, p in model.named_parameters()
+        if "leaf_logits" not in n and p.requires_grad
+    ]
     polish_opt = torch.optim.AdamW(polish_params, lr=cfg.polish_lr, weight_decay=cfg.weight_decay)
     head.set_temperature(cfg.harden_end_temp)
     for _ in range(polish_n):
@@ -121,9 +142,16 @@ def run_odrzywolek_pipeline(
         stages.polish_losses.append(_train_step(model, x, y, polish_opt))
 
     head.leaf_logits.requires_grad_(True)
+    if cfg.freeze_trunk_after_search:
+        for p in model.trunk.parameters():
+            p.requires_grad_(True)
     all_losses = stages.search_losses + stages.harden_losses + stages.polish_losses
 
-    # --- SNAP (export only) ---
+    # --- SNAP (export + faithfulness measurement) ---
+    # snapped_train_mse quantifies how much accuracy the closed-form export loses
+    # relative to the soft model (paper's snapping-success criterion).
+    snapped_train_mse, _ = evaluate_snapped(model, x, y)
+
     soft_state = copy.deepcopy(model.state_dict())
     model.eval()
     apply_snap_to_logits(model.head)
@@ -141,4 +169,5 @@ def run_odrzywolek_pipeline(
         search_steps=search_n,
         harden_steps=harden_n,
         polish_steps=polish_n,
+        snapped_train_mse=snapped_train_mse,
     )

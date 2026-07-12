@@ -116,12 +116,16 @@ def main() -> None:
             mse_threshold=thr,
             numeric_ok=numeric_ok,
         )
+        snapped_mse = sym.snapped_mse if sym.snapped_mse is not None else float("nan")
+        snap_degrade = snapped_mse / hold_mse if hold_mse > 0 else float("nan")
         row = {
             "target_id": tid,
             "true_formula": target.formula,
             "monotonic": target.monotonic,
             "final_train_mse": tr.final_mse,
             "holdout_mse": hold_mse,
+            "snapped_holdout_mse": snapped_mse,
+            "snap_degrade_ratio": snap_degrade,
             "mse_threshold": thr,
             "numeric_ok": numeric_ok,
             "symbolic_ok": sym.symbolic_ok,
@@ -139,7 +143,8 @@ def main() -> None:
         status = []
         status.append("NUM OK" if numeric_ok else "NUM FAIL")
         status.append("SYM OK" if sym.symbolic_ok else "SYM FAIL")
-        print(f"  holdout_mse={hold_mse:.4e} train_sec={tr.train_seconds:.1f}s ({', '.join(status)})")
+        print(f"  holdout_mse={hold_mse:.4e} snapped_mse={snapped_mse:.4e} "
+              f"(x{snap_degrade:.1f}) train_sec={tr.train_seconds:.1f}s ({', '.join(status)})")
         print(f"  template_guess={sym.template_guess} template_mse={sym.template_mse}")
         if sym.simplified:
             print(f"  simplified={sym.simplified}")
@@ -164,16 +169,21 @@ def main() -> None:
     md_lines = [
         f"# SR Phase {args.phase} Results",
         "",
+        "- **numeric OK** = soft (trained) model holdout MSE within threshold.",
+        "- **symbolic OK** = *snapped* closed-form EML expression holdout MSE within",
+        "  threshold (i.e. snapping is faithful — the paper's snapping-success claim).",
+        "",
         f"- numeric OK: {summary['numeric_success']}/{summary['total']}",
         f"- symbolic OK: {summary['symbolic_success']}/{summary['total']}",
         "",
-        "| target | true | mono | holdout MSE | numeric | symbolic | guess |",
-        "|--------|------|------|-------------|---------|----------|-------|",
+        "| target | true | mono | holdout MSE | snapped MSE | degrade | numeric | symbolic | guess |",
+        "|--------|------|------|-------------|-------------|---------|---------|----------|-------|",
     ]
     for r in rows:
         md_lines.append(
             f"| {r['target_id']} | `{r['true_formula']}` | {r['monotonic']} | "
-            f"{r['holdout_mse']:.2e} | {r['numeric_ok']} | {r['symbolic_ok']} | "
+            f"{r['holdout_mse']:.2e} | {r['snapped_holdout_mse']:.2e} | "
+            f"x{r['snap_degrade_ratio']:.1f} | {r['numeric_ok']} | {r['symbolic_ok']} | "
             f"`{r['template_guess']}` |"
         )
     (out_dir / "summary.md").write_text("\n".join(md_lines) + "\n", encoding="utf-8")

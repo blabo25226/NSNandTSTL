@@ -21,3 +21,9 @@
 - **作業内容**: 論文再現承諾（Colab GPU）。R1 コア: `llm_freeze.py`, `llm_eval.py`, `llm_grpo.py`, `llm_profile.py`, `requirements-r.txt`, `notebooks/tstl_r1_colab.ipynb`, テスト追加。
 - **変更ファイル**: `TSTL/src/llm_*.py`, `TSTL/tests/test_llm_*.py`, `TSTL/notebooks/tstl_r1_colab.ipynb`, `TSTL/texts/論文再現計画書.md`, `TSTL/daily_report.md`
 - **メモ**: ローカルは Intel Arc + PyTorch CPU。GRPO 実行は Colab のみ。
+
+## 2026-07-13 03:40
+
+- **作業内容**: Colab ノートブック修正。Cursor 拡張は nb のみ送信のため、セル1で git clone + `sys.path` + `pip install -r` を自動化。
+- **変更ファイル**: `TSTL/notebooks/tstl_r1_colab.ipynb`, `TSTL/daily_report.md`
+- **メモ**: エラー原因は `/content` に `requirements-r.txt` と `src/` が無かったこと。

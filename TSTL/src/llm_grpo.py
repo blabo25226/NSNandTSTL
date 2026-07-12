@@ -26,6 +26,7 @@ class GrpoRunConfig:
     num_generations: int = 4
     seed: int = 42
     train_layer_indices: list[int] | None = None  # None = full model
+    tokenizer: Any | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -132,12 +133,15 @@ def run_grpo_train(
     model: nn.Module,
     dataset: Any,
     config: GrpoRunConfig,
-    *,
-    tokenizer: Any | None = None,
 ) -> Path:
     """Run GRPO and return checkpoint directory."""
     config.output_dir.mkdir(parents=True, exist_ok=True)
-    trainer = build_grpo_trainer(model, dataset, config, tokenizer=tokenizer)
+    trainer = build_grpo_trainer(
+        model,
+        dataset,
+        config,
+        tokenizer=config.tokenizer,
+    )
     trainer.train()
     trainer.save_model(str(config.output_dir))
     return config.output_dir

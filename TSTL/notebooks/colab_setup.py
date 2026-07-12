@@ -34,9 +34,16 @@ def _clone() -> Path:
 
 
 def _update_clone() -> Path:
-    _git(["git", "fetch", "origin", BRANCH], cwd=CLONE_DIR)
-    _git(["git", "checkout", BRANCH], cwd=CLONE_DIR)
-    _git(["git", "pull", "origin", BRANCH], cwd=CLONE_DIR)
+    import shutil
+
+    try:
+        _git(["git", "fetch", "origin", BRANCH], cwd=CLONE_DIR)
+        _git(["git", "checkout", BRANCH], cwd=CLONE_DIR)
+        _git(["git", "reset", "--hard", f"origin/{BRANCH}"], cwd=CLONE_DIR)
+    except subprocess.CalledProcessError as exc:
+        print(f"git sync failed ({exc}); re-cloning")
+        shutil.rmtree(CLONE_DIR)
+        return _clone()
     return CLONE_DIR / "TSTL"
 
 

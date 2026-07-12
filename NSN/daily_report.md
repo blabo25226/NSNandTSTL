@@ -69,3 +69,27 @@
   - 結果（Phase 3, seed=42, 新定義）: **symbolic 5/6**（square/product/exp/sin/sin_plus 成功、sum のみ 0.025 で僅差不合格）。論文中核主張「スナップ後 head が忠実な閉形式」を head レベルで再現。
 - **変更ファイル**: `NSN/src/pipeline.py`, `eml_tree.py`, `snap.py`, `tests/test_eml_tree.py`, `texts/SR検証計画.md`, `NSN/daily_report.md`
 - **メモ**: pytest 39 件 PASS（gamma-mask テスト 2 件追加）。sum は EML 木で線形和を厳密表現しづらい表現力の限界（数値発散ではない）。次: 残る sum の改善（depth=3 or f_prev=parent の export 対応）か、Feynman DB 本番へ。
+
+## 2026-07-13 03:20
+
+- **作業内容**: 別 AI レビューの指摘②③④に対応（①実 Feynman DB×EQL/KAN は別途）。
+  - **② f_prev マスター公式の完全実装＋export 対応**: `parent` モードを **K 回反復（Jacobi）** に一般化
+    （`EMLTreeHead.f_prev_passes`, 既定 K=1 で後方互換）。葉 i の f_prev＝親 EML ノード出力という論文定義を
+    不動点として K 反復で近づける。`snap.export_symbolic_expression` を parent モードで分岐させ、γ ブランチを
+    親ノード式 `eml(兄弟対^(t-1))` に再帰置換（pass0 は const）。**one-hot 重みで export 文字列＝snapped forward が
+    厳密一致**することをテストで確認（K=1,2）。旧「1 ステップ近似・export 非対応」を解消。
+  - **③ trunk 解釈性（二層解釈の下半分）**: 新 `src/trunk_interpret.py`。`linear_readout`（線形 trunk は厳密
+    (W,b)・R²=1、非線形は最小二乗蒸留＋成分別 R²）、`compose_symbolic`（z(x) を head export へ合成し
+    **ŷ を x の単一閉形式**に）、`trunk_attribution`（線形 |W|／非線形 mean|∂z/∂x|）。`trunk.py` に
+    `linear_weights()` と `num_layers=1` 線形 trunk サポート。`scripts/trunk_interpret_eval.py` 追加。
+    線形 trunk では合成閉形式＝snapped model 出力が一致（R²=1）することを実機確認。
+  - **④ D≥5 破綻の検証準備**: `EMLTreeHead` の depth 上限を [1,4]→[1,8] に緩和（>4 は `warnings.warn`）。
+    `scripts/depth_sweep_eval.py` 追加（depth×seed の成功率・有限率・snapped MSE 中央値を集計）。
+- **変更ファイル**: `NSN/src/eml_tree.py`, `snap.py`, `model.py`, `trunk.py`, `src/trunk_interpret.py`(新),
+  `scripts/trunk_interpret_eval.py`(新), `scripts/depth_sweep_eval.py`(新),
+  `tests/test_eml_tree.py`, `tests/test_trunk_interpret.py`(新), `.gitignore`, `NSN/texts/SR検証計画.md`
+- **メモ**: pytest **44 件 PASS**（parent-export 忠実性・不動点残差・depth5・線形合成の 5 件追加）。
+  depth スイープ結果（sin/product × seed{0,1} × 1000 step, `results/depth_sweep_20260712_192811/`）:
+  **有限率（NaN なし）が D≥5 で急落** — D2/3/4=**1.00**, D5=**0.50**, D6=**0.25**（NaN loss で学習破綻）。
+  論文の「D≥5 で学習成功率が急落」を**数値破綻（NaN）として再現**。snapped MSE も D4/D6 で 1e17 級に発散。
+  成功率（snapped≤5e-2）は短ステップ設定のため全深さで低く、崩壊の識別子は有限率。

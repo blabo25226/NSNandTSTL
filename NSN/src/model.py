@@ -37,6 +37,7 @@ class DNNEML(nn.Module):
         concat_input: bool = False,
         leaf_softmax_mode: LeafSoftmaxMode | str = LeafSoftmaxMode.SOFTMAX,
         f_prev_mode: str = "zero",
+        f_prev_passes: int = 1,
     ) -> "DNNEML":
         mode = (
             leaf_softmax_mode
@@ -56,6 +57,7 @@ class DNNEML(nn.Module):
             head = EMLTreeHead(
                 feature_dim=head_dim, depth=head_depth,
                 leaf_softmax_mode=mode, f_prev_mode=f_prev_mode,
+                f_prev_passes=f_prev_passes,
             )
             return cls(trunk, head, concat_input=True)
         trunk = MLPTrunk(
@@ -68,6 +70,7 @@ class DNNEML(nn.Module):
         head = EMLTreeHead(
             feature_dim=feature_dim, depth=head_depth,
             leaf_softmax_mode=mode, f_prev_mode=f_prev_mode,
+            f_prev_passes=f_prev_passes,
         )
         return cls(trunk, head, concat_input=False)
 

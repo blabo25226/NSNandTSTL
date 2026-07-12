@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,6 +11,11 @@ import torch.nn.functional as F
 from eml import EMLNode
 from leaf_softmax import LeafSoftmaxMode, leaf_weights
 from utils import as_complex, real_out
+
+# Paper recommends D <= 4 (D >= 5 training success drops sharply). Larger depths
+# are allowed for the depth-sweep study but warned about.
+RECOMMENDED_MAX_DEPTH = 4
+MAX_DEPTH = 8
 
 
 class EMLTreeHead(nn.Module):
@@ -24,12 +31,19 @@ class EMLTreeHead(nn.Module):
       - "zero"   : f_prev = f_prev_const (default 0) for every leaf. This is the
                    v1 behaviour and matches bottom-up evaluation where a leaf's
                    parent is not yet computed.
-      - "parent" : approximate the master-formula recurrence. A first pass with
-                   f_prev=0 computes each leaf's parent EML node output; the
-                   leaves are then recomputed with gamma * (parent output). This
-                   is a single top-down feedback step (one Jacobi iteration), not
-                   the exact fixed point, and is intended for capacity studies.
-                   Symbolic export currently assumes "zero".
+      - "parent" : the master-formula recurrence (paper Eq. 9), where a leaf's
+                   f_prev is the output of its parent (bottom-most internal) EML
+                   node, 0 at the root. Because a leaf value contains gamma *
+                   f_prev while its parent output is an eml of leaf values, the
+                   relation is a fixed point. It is solved by `f_prev_passes` (K)
+                   Jacobi iterations starting from f_prev = f_prev_const:
+
+                       leaves^(0) = base + w_g * const
+                       leaves^(t) = base + w_g * parent_outputs(leaves^(t-1))
+
+                   K=1 reproduces the original single-step feedback. Symbolic
+                   export mirrors this exact K-pass computation, so the exported
+                   closed form is faithful to the snapped forward pass.
     """
 
     def __init__(
@@ -39,19 +53,29 @@ class EMLTreeHead(nn.Module):
         temperature: float = 1.0,
         f_prev: float = 0.0,
         f_prev_mode: str = "zero",
+        f_prev_passes: int = 1,
         leaf_softmax_mode: LeafSoftmaxMode | str = LeafSoftmaxMode.SOFTMAX,
     ) -> None:
         super().__init__()
-        if depth < 1 or depth > 4:
-            raise ValueError("depth must be in [1, 4]")
+        if depth < 1 or depth > MAX_DEPTH:
+            raise ValueError(f"depth must be in [1, {MAX_DEPTH}]")
+        if depth > RECOMMENDED_MAX_DEPTH:
+            warnings.warn(
+                f"depth={depth} exceeds recommended max {RECOMMENDED_MAX_DEPTH}; "
+                "the paper reports sharply lower training success for D >= 5.",
+                stacklevel=2,
+            )
         if f_prev_mode not in ("zero", "parent"):
             raise ValueError("f_prev_mode must be 'zero' or 'parent'")
+        if f_prev_passes < 1:
+            raise ValueError("f_prev_passes must be >= 1")
 
         self.feature_dim = feature_dim
         self.depth = depth
         self.temperature = temperature
         self.f_prev_const = f_prev
         self.f_prev_mode = f_prev_mode
+        self.f_prev_passes = f_prev_passes
         self.leaf_softmax_mode = (
             mode if isinstance(mode := leaf_softmax_mode, LeafSoftmaxMode)
             else LeafSoftmaxMode.parse(leaf_softmax_mode)
@@ -153,9 +177,11 @@ class EMLTreeHead(nn.Module):
                 (batch, self.num_leaves), self.f_prev_const,
                 device=z.device, dtype=z.dtype,
             )
-            leaves_pass1 = base_c + wg_c * as_complex(const)
-            f_prev = self._parent_outputs(leaves_pass1)
-            return base_c + wg_c * f_prev
+            leaves = base_c + wg_c * as_complex(const)
+            for _ in range(self.f_prev_passes):
+                f_prev = self._parent_outputs(leaves)
+                leaves = base_c + wg_c * f_prev
+            return leaves
 
         f_prev = torch.full(
             (batch, self.num_leaves),

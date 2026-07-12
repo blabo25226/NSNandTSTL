@@ -159,3 +159,55 @@ pipeline の `freeze_trunk_after_search` フラグが対応する。
 - `src/eml_tree.py` — EML 木 head（`f_prev_mode`）
 - `scripts/sr_eval.py` — 評価実行（snapped MSE 列を含む）
 - `scripts/head_capacity_eval.py` — head vs trunk 容量研究
+
+## 別 AI レビュー②③④への対応（2026-07-13）
+
+### ② f_prev マスター公式：K 回反復＋忠実 export（`parent` モード）
+
+論文の葉 `l_i = α + βᵀz + γ·f_prev`、f_prev＝親 EML ノード出力（根 0）は、葉値が f_prev を含むため循環する。
+`EMLTreeHead.f_prev_passes`（K）で **K 回の Jacobi 反復**により不動点へ近づける（K=1 が旧挙動＝後方互換）:
+
+```
+leaves^(0) = base + w_g·const
+leaves^(t) = base + w_g·parent_outputs(leaves^(t-1))   (t=1..K)
+```
+
+`snap.export_symbolic_expression` を `parent` モードで分岐し、γ を選んだ葉の記号を
+`eml(leaf_symbol^(t-1)[2k], leaf_symbol^(t-1)[2k+1])` に pass K-1 まで再帰置換（pass0 の γ は const）。
+one-hot 重みでは base=0・w_g=1 なので葉値＝f_prev となり、**export 文字列を数値評価した値＝snapped forward** が
+厳密一致（`test_parent_export_faithful_k1_and_k2`）。旧「1 ステップ近似・export 非対応」を解消。
+
+### ③ trunk 解釈性：二層解釈の下半分（x→z）を白箱化
+
+`src/trunk_interpret.py`:
+- `linear_readout(model, x)`: 線形 trunk（`num_layers=1`）は厳密 (W,b)・R²=1、非線形は最小二乗蒸留＋成分別 R²。
+- `compose_symbolic(model, readout, x_names)`: z_j を `"(w·x + b)"` 文字列にして
+  既存 `export_symbolic_expression` を再利用し、**ŷ を x の単一閉形式**へ合成。
+- `trunk_attribution(model, x, top_k)`: 線形は |W|、非線形は `mean|∂z_j/∂x_i|`（autograd）で各 z 成分の上位入力。
+
+線形 trunk では合成閉形式＝snapped model 出力が一致（`test_linear_readout_exact_and_composition_faithful`）。
+「表型 ≈ 初等関数（入力の線形結合の非線形変換）」という監査可能な単一式が得られる。
+`scripts/trunk_interpret_eval.py`（`--trunk linear|mlp`）。低次元は線形 trunk で厳密閉形式、
+高次元は MLP＋蒸留（R² 付き）＋寄与レポートで対応。
+
+### ④ D≥5 破綻の検証
+
+`EMLTreeHead` の depth 上限を [1,4]→[1,8] に緩和（>4 は警告）。`scripts/depth_sweep_eval.py` が
+depth∈{2..6}×seed で `run_odrzywolek_pipeline` を回し、成功率（snapped MSE≤5e-2）・有限率・snapped MSE 中央値を集計。
+学習が NaN で落ちた場合は失敗として記録。結果は `results/depth_sweep_<ts>/summary.{json,md}`。
+
+**結果（sin/product × seed{0,1} × 1000 step, `results/depth_sweep_20260712_192811/`）**:
+
+| depth | 有限率(NaN なし) | snapped MSE 中央値 |
+|-------|------------------|--------------------|
+| 2 | 1.00 | 2.8e0 |
+| 3 | 1.00 | 8.0e-1 |
+| 4 | 1.00 | 1.4e17 |
+| 5 | **0.50** | 2.0e2 |
+| 6 | **0.25** | 3.9e16 |
+
+**D≥5 で有限率が急落**（D≤4=100% → D5=50% → D6=25%）し、`run_odrzywolek_pipeline` が
+NaN loss で停止する。論文の「D≥5 で学習成功率が急落」を**数値破綻として再現**した。
+snapped MSE も深い木（D4/D6）で 1e17 級に発散し、export の数値不安定性を示す。
+成功率（snapped≤5e-2）は本短ステップ設定では全深さで低く、崩壊の主指標は有限率。
+本番評価では D≤4 推奨（`RECOMMENDED_MAX_DEPTH=4`, EMLTreeHead は >4 で警告）。

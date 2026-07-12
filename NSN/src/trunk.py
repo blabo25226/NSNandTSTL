@@ -34,6 +34,20 @@ class MLPTrunk(nn.Module):
             in_dim = hidden_dim
         layers.append(nn.Linear(in_dim, feature_dim))
         self.net = nn.Sequential(*layers)
+        # A single-Linear trunk (num_layers=1) is exactly linear: z = W x + b.
+        self.is_linear = num_layers == 1
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
+
+    def linear_weights(self) -> tuple[torch.Tensor, torch.Tensor] | None:
+        """
+        Exact (W, b) with z = W x + b when the trunk is a single Linear layer.
+
+        Returns None for a multi-layer (nonlinear) trunk, where an exact linear
+        readout does not exist (use distillation instead).
+        """
+        if not self.is_linear:
+            return None
+        lin = self.net[0]
+        return lin.weight.detach().clone(), lin.bias.detach().clone()

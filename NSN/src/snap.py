@@ -45,9 +45,9 @@ def apply_hardening(
 
 
 def snap_leaf_weights(head: "EMLTreeHead") -> torch.Tensor:
-    """Hard snap: one-hot per leaf from argmax over logits."""
+    """Hard snap: one-hot per leaf from argmax over the effective logits."""
     with torch.no_grad():
-        idx = head.leaf_logits.argmax(dim=-1)
+        idx = head.effective_logits().argmax(dim=-1)
         hard = torch.zeros_like(head.leaf_logits)
         hard.scatter_(1, idx.unsqueeze(-1), 1.0)
     return hard
@@ -91,7 +91,7 @@ def evaluate_snapped(
 
 
 def _leaf_symbol_snapped(head: "EMLTreeHead", leaf_index: int, z_names: list[str]) -> str:
-    logits = head.leaf_logits[leaf_index]
+    logits = head.effective_logits()[leaf_index]
     mode = int(logits.argmax().item())
     if mode == 0:
         return f"{head.alpha[leaf_index].item():.6g}"

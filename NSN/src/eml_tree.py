@@ -70,6 +70,21 @@ class EMLTreeHead(nn.Module):
     def set_temperature(self, temperature: float) -> None:
         self.temperature = max(temperature, 1e-6)
 
+    def effective_logits(self) -> torch.Tensor:
+        """
+        Leaf logits with the gamma (f_prev) branch masked out in "zero" mode.
+
+        In zero mode f_prev = 0, so a leaf snapped to gamma is either a useless
+        0 addend or, when it feeds the y-slot of an eml, injects ln(eps) ~ -27.6
+        (a large spurious constant that wrecks the snapped output). Masking keeps
+        snapping to the well-defined {alpha, beta^T z} branches.
+        """
+        if self.f_prev_mode == "zero":
+            mask = torch.zeros_like(self.leaf_logits)
+            mask[:, 2] = -1e9
+            return self.leaf_logits + mask
+        return self.leaf_logits
+
     def set_leaf_constant(self, leaf_index: int, value: float) -> None:
         """Pin leaf to constant value (alpha term only). For tests / symbolic setup."""
         with torch.no_grad():
@@ -102,7 +117,7 @@ class EMLTreeHead(nn.Module):
     def _base_and_gamma(self, z: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Return (base, w_gamma): base = w_a*alpha + w_b*(beta^T z), gamma weight."""
         weights = leaf_weights(
-            self.leaf_logits,
+            self.effective_logits(),
             self.temperature,
             self.leaf_softmax_mode,
             training=self.training,

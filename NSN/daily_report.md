@@ -60,3 +60,12 @@
   - **(5) ドキュメント**: `texts/SR検証計画.md` に symbolic 再定義・設計判断（Eq9 softmax 解釈, f_prev, head-capacity, Feynman 合成代替）を追記。
 - **変更ファイル**: `NSN/src/snap.py`, `pipeline.py`, `trainer.py`, `simplify.py`, `eml_tree.py`, `model.py`, `scripts/sr_eval.py`, `scripts/head_capacity_eval.py`, `tests/test_eml_tree.py`, `texts/SR検証計画.md`, `NSN/daily_report.md`
 - **メモ**: pytest 37 件 PASS。Feynman DB 実データ×深さ{2,3,4}×EQL/KAN 比較は計算時間が長いため別途まとめて実施予定。次: `sr_eval.py` を再実行し新 symbolic 定義での成功率を測る。
+
+## 2026-07-13 02:30
+
+- **作業内容**: スナップ忠実性を実測→改善。`head_capacity_eval` を本ステップ(4000)で実行し、素の soft 学習では snap 劣化が **x17〜x180000** と判明（head でなく trunk が当てはめている）。2 機構で是正:
+  - **snap-aware polish**（`snap_aware_polish=True`, 既定）: POLISH 前に離散選択を確定し連続パラメータをその離散木に合わせ込む。→ 全ターゲット faithfulness **x1.0**（snapped=soft）。
+  - **gamma-branch マスク**（`EMLTreeHead.effective_logits()`）: zero モードで f_prev=0 の gamma ブランチを argmax から除外。eml の y 引数が `ln(1e-12)≈-27.6` の偽定数を注入する数値発散を解消（`sum`: 12.9→0.025）。
+  - 結果（Phase 3, seed=42, 新定義）: **symbolic 5/6**（square/product/exp/sin/sin_plus 成功、sum のみ 0.025 で僅差不合格）。論文中核主張「スナップ後 head が忠実な閉形式」を head レベルで再現。
+- **変更ファイル**: `NSN/src/pipeline.py`, `eml_tree.py`, `snap.py`, `tests/test_eml_tree.py`, `texts/SR検証計画.md`, `NSN/daily_report.md`
+- **メモ**: pytest 39 件 PASS（gamma-mask テスト 2 件追加）。sum は EML 木で線形和を厳密表現しづらい表現力の限界（数値発散ではない）。次: 残る sum の改善（depth=3 or f_prev=parent の export 対応）か、Feynman DB 本番へ。

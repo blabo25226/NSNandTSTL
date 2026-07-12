@@ -36,6 +36,12 @@ class OdrzywolekPipelineConfig:
     # Head-capacity study: freeze the trunk after SEARCH so the EML head must
     # carry the symbolic load during HARDEN/POLISH instead of the black-box MLP.
     freeze_trunk_after_search: bool = False
+    # Snap-aware POLISH: commit the discrete leaf choices (argmax -> one-hot)
+    # *before* polishing, so the continuous params (alpha/beta/trunk) are fit to
+    # the exact discrete tree that will be exported. This makes the snapped
+    # closed-form faithful by construction (snapped MSE ~= final soft MSE)
+    # instead of restoring soft weights that argmax then discards.
+    snap_aware_polish: bool = True
 
 
 @dataclass
@@ -130,6 +136,12 @@ def run_odrzywolek_pipeline(
         stages.harden_losses.append(_train_step(model, x, y, opt))
 
     # --- POLISH ---
+    if cfg.snap_aware_polish:
+        # Commit discrete leaf choices, then fit continuous params to that exact
+        # tree. With one-hot(+-20) logits and a low temperature the forward pass
+        # already equals the exported/snapped model, so POLISH minimises the
+        # snapped loss directly.
+        apply_snap_to_logits(head)
     head.leaf_logits.requires_grad_(False)
     polish_params = [
         p for n, p in model.named_parameters()

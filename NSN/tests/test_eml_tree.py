@@ -97,3 +97,25 @@ def test_f_prev_mode_validation():
 
     with pytest.raises(ValueError):
         EMLTreeHead(feature_dim=2, depth=2, f_prev_mode="bogus")
+
+
+def test_zero_mode_masks_gamma_branch():
+    """In zero mode the gamma (f_prev) branch must never win the argmax snap."""
+    from snap import snap_leaf_weights
+
+    head = EMLTreeHead(feature_dim=3, depth=2, f_prev_mode="zero")
+    with torch.no_grad():
+        head.leaf_logits.fill_(0.0)
+        head.leaf_logits[:, 2] = 5.0  # try to make gamma dominant
+    eff = head.effective_logits()
+    assert torch.all(eff[:, 2] < -1e8)
+    hard = snap_leaf_weights(head)
+    assert torch.all(hard[:, 2] == 0.0)  # gamma never selected
+
+
+def test_parent_mode_keeps_gamma_branch():
+    head = EMLTreeHead(feature_dim=3, depth=2, f_prev_mode="parent")
+    with torch.no_grad():
+        head.leaf_logits.fill_(0.0)
+    eff = head.effective_logits()
+    assert torch.allclose(eff, head.leaf_logits)

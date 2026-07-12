@@ -63,10 +63,39 @@ python scripts/sr_eval.py --phase 3 --seed 42
 - `src/simplify.py`: EML 文字列の一部ルール簡約 + 初等テンプレート照合
 - 完全な `eml → sin` 変換は未実装（Odrzywołek 全ルールは今後）
 
-## 旧「最新結果」（seed=42, noise_std_rel=0.01, 2026-07-13 早朝）
+## 最新結果（新定義, seed=42, noise_std_rel=0.01, 2026-07-13）
+
+**snap-aware polish + gamma-mask** 導入後。symbolic OK は **スナップ済み閉形式の holdout MSE ≤ 閾値**（忠実性）で判定。
+faithfulness は全ターゲットで **x1.0**（snapped MSE = soft MSE）＝スナップは構成上ロスレス。
+
+| target | true | snapped holdout MSE | symbolic OK |
+|--------|------|---------------------|-------------|
+| square | `x0^2` | 4.8e-4 | ✅ |
+| product | `x0*x1` | 1.4e-4 | ✅ |
+| sum | `x0+x1` | 2.5e-2 | ❌（閾値1e-2に僅差。EML木で線形和の厳密表現が本質的に困難） |
+| exp | `exp(x0)` | 1.2e-4 | ✅ |
+| sin | `sin(x0)` | 6.8e-4 | ✅ |
+| sin_plus | `sin(x0)+x1` | 3.0e-4 | ✅ |
+| **Phase 3 合計** | | | **5/6** |
+
+論文の中核主張「スナップ後の head が忠実な閉形式になる」を head レベルで再現（5/6）。
+残る `sum` は数値発散ではなく表現力の僅差（0.025 vs 0.01）。
+
+### スナップ忠実性を実現した2つの機構（2026-07-13）
+
+1. **snap-aware polish**（`OdrzywolekPipelineConfig.snap_aware_polish=True`, 既定）:
+   POLISH の前に離散選択を確定（argmax→one-hot）し、連続パラメータ（α/β/trunk）を**その離散木に合わせ込む**。
+   これで学習対象＝export される木そのものになり、snapped MSE ≈ soft MSE。
+   導入前は snap 劣化が **x17〜x180000**（`head_capacity_eval` 参照）だった。
+2. **gamma-branch マスク**（`EMLTreeHead.effective_logits()`）:
+   zero モードでは f_prev=0 のため gamma ブランチが無意味かつ有害
+   （eml の y 引数になると `ln(1e-12)≈-27.6` の偽定数を注入）。zero モードでは gamma を argmax 対象から除外。
+   これで `sum` の数値発散（12.9→0.025）を解消。
+
+## 旧「結果」（seed=42, 2026-07-13 早朝、参考）
 
 > ⚠️ 下表 symbolic OK 9/9 は **旧・誤定義**（ソフトモデルのテンプレート照合）による値。
-> 新定義（スナップ忠実性）では symbolic OK は大幅に下がる見込み。`sr_eval.py` を再実行して更新すること。
+> スナップ済み式は検証しておらず、実際にはスナップが忠実でなかった（上の新結果で是正）。
 
 | Phase | numeric OK | symbolic OK (旧定義) | 学習時間 | 壁時計 |
 |-------|------------|----------------------|----------|--------|

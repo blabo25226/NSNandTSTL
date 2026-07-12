@@ -1,6 +1,6 @@
 # TSTL Phase R1 — Colab (T4 16GB) defaults
 model_name: Qwen/Qwen2.5-0.5B-Instruct
-dataset: gsm8k
+dataset: openai/gsm8k
 train_subset: 256
 eval_subset: 64
 num_layers_scan: null  # null = all transformer blocks

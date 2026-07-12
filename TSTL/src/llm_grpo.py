@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import torch.nn as nn
 
+from llm_eval import answers_match, extract_numeric_answer
 from llm_freeze import freeze_all_except_layers
 
 
@@ -20,8 +22,8 @@ class GrpoRunConfig:
     num_train_steps: int = 200
     per_device_batch_size: int = 1
     gradient_accumulation_steps: int = 4
-    max_prompt_length: int = 256
-    max_completion_length: int = 128
+    max_completion_length: int = 256
+    num_generations: int = 4
     seed: int = 42
     train_layer_indices: list[int] | None = None  # None = full model
     extra: dict[str, Any] = field(default_factory=dict)
@@ -36,16 +38,51 @@ def grpo_dependencies_available() -> bool:
         return False
 
 
+def gsm8k_numeric_reward(
+    completions: list[list[dict[str, str]]],
+    answer: list[str],
+    **kwargs: Any,
+) -> list[float]:
+    """Exact-match reward on GSM8K numeric answers (no math_verify dependency)."""
+    rewards: list[float] = []
+    for completion, gold_text in zip(completions, answer, strict=True):
+        pred_text = completion[0]["content"]
+        pred = extract_numeric_answer(pred_text)
+        gold = extract_numeric_answer(gold_text)
+        rewards.append(1.0 if answers_match(pred, gold) else 0.0)
+    return rewards
+
+
 def apply_layer_policy(model: nn.Module, layer_indices: list[int] | None) -> None:
-    """Set requires_grad according to TSTL single-layer / full policy."""
     freeze_all_except_layers(model, layer_indices)
 
 
-def build_grpo_trainer(model: nn.Module, dataset: Any, config: GrpoRunConfig) -> Any:
+def _coerce_train_dataset(dataset: Any) -> Any:
+    if isinstance(dataset, list):
+        from datasets import Dataset
+
+        return Dataset.from_list(dataset)
+    return dataset
+
+
+def _filter_grpo_config_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Drop keys unsupported by the installed TRL GRPOConfig (version-safe)."""
+    from trl import GRPOConfig
+
+    params = inspect.signature(GRPOConfig.__init__).parameters
+    return {k: v for k, v in kwargs.items() if k in params}
+
+
+def build_grpo_trainer(
+    model: nn.Module,
+    dataset: Any,
+    config: GrpoRunConfig,
+    *,
+    tokenizer: Any | None = None,
+    reward_funcs: Callable[..., list[float]] | None = None,
+) -> Any:
     """
     Construct a TRL GRPOTrainer. Requires GPU + transformers + trl (Colab).
-
-    Raises ImportError on CPU-only local dev machines without TRL.
     """
     if not grpo_dependencies_available():
         raise ImportError(
@@ -56,32 +93,51 @@ def build_grpo_trainer(model: nn.Module, dataset: Any, config: GrpoRunConfig) ->
     from trl import GRPOConfig, GRPOTrainer
 
     apply_layer_policy(model, config.train_layer_indices)
+    train_dataset = _coerce_train_dataset(dataset)
+    reward = reward_funcs or gsm8k_numeric_reward
 
-    training_args = GRPOConfig(
-        output_dir=str(config.output_dir),
-        learning_rate=config.learning_rate,
-        max_steps=config.num_train_steps,
-        per_device_train_batch_size=config.per_device_batch_size,
-        gradient_accumulation_steps=config.gradient_accumulation_steps,
-        max_prompt_length=config.max_prompt_length,
-        max_completion_length=config.max_completion_length,
-        seed=config.seed,
-        logging_steps=10,
-        save_steps=max(config.num_train_steps, 1),
-        report_to="none",
+    raw_kwargs = {
+        "output_dir": str(config.output_dir),
+        "learning_rate": config.learning_rate,
+        "max_steps": config.num_train_steps,
+        "per_device_train_batch_size": config.per_device_batch_size,
+        "gradient_accumulation_steps": config.gradient_accumulation_steps,
+        "max_completion_length": config.max_completion_length,
+        "num_generations": config.num_generations,
+        "seed": config.seed,
+        "logging_steps": 10,
+        "save_steps": max(config.num_train_steps, 1),
+        "report_to": "none",
+        "remove_unused_columns": False,
         **config.extra,
-    )
-    return GRPOTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=dataset,
-    )
+    }
+    training_args = GRPOConfig(**_filter_grpo_config_kwargs(raw_kwargs))
+
+    trainer_kwargs: dict[str, Any] = {
+        "model": model,
+        "args": training_args,
+        "reward_funcs": reward,
+        "train_dataset": train_dataset,
+    }
+    if tokenizer is not None:
+        if "processing_class" in inspect.signature(GRPOTrainer.__init__).parameters:
+            trainer_kwargs["processing_class"] = tokenizer
+        else:
+            trainer_kwargs["tokenizer"] = tokenizer
+
+    return GRPOTrainer(**trainer_kwargs)
 
 
-def run_grpo_train(model: nn.Module, dataset: Any, config: GrpoRunConfig) -> Path:
+def run_grpo_train(
+    model: nn.Module,
+    dataset: Any,
+    config: GrpoRunConfig,
+    *,
+    tokenizer: Any | None = None,
+) -> Path:
     """Run GRPO and return checkpoint directory."""
     config.output_dir.mkdir(parents=True, exist_ok=True)
-    trainer = build_grpo_trainer(model, dataset, config)
+    trainer = build_grpo_trainer(model, dataset, config, tokenizer=tokenizer)
     trainer.train()
     trainer.save_model(str(config.output_dir))
     return config.output_dir

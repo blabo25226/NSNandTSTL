@@ -21,3 +21,15 @@
 - **作業内容**: ユーザー指摘に基づき `README.md` の記号説明を修正。n=サンプルサイズ（行数・標本の個数）、1標本=観測1件と明記。「サンプル数」表記を廃止。
 - **変更ファイル**: `README.md`, `daily_report.md`
 - **メモ**: なし
+
+## 2026-07-13 02:45
+
+- **作業内容**: TSTL Phase 0-B 向け作業計画書を `TSTL/texts/作業計画書.md` に作成。ブランチ `20260713_create_TSTL`。コーディングはユーザー承諾後。
+- **変更ファイル**: `TSTL/texts/作業計画書.md`, `TSTL/daily_report.md`, `daily_report.md`
+- **メモ**: 詳細ログは `TSTL/daily_report.md` を参照。
+
+## 2026-07-13 02:57
+
+- **作業内容**: TSTL Phase 0-B コーディング完了（層凍結・C(k)・戦略・MLP ベンチ・CLI）。pytest 11 件 PASS。
+- **変更ファイル**: `TSTL/` 配下（src, tests, scripts, requirements.txt）
+- **メモ**: 詳細は `TSTL/daily_report.md`

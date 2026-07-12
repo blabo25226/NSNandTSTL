@@ -21,3 +21,9 @@
 - **作業内容**: ユーザー指摘に基づき `README.md` の記号説明を修正。n=サンプルサイズ（行数・標本の個数）、1標本=観測1件と明記。「サンプル数」表記を廃止。
 - **変更ファイル**: `README.md`, `daily_report.md`
 - **メモ**: なし
+
+## 2026-07-12 23:32
+
+- **作業内容**: `AGENTS.md` を更新し、サブプロジェクト別 `daily_report.md` のルールを追加（NSN → `NSN/daily_report.md`）。NSN 作業ログは同ファイルへ移行。
+- **変更ファイル**: `AGENTS.md`, `NSN/daily_report.md`, `NSN/texts/作業計画書.md`, `daily_report.md`
+- **メモ**: ルート `daily_report.md` は共通・非 NSN 作業用。

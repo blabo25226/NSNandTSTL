@@ -1,0 +1,29 @@
+{
+  "phase": 1,
+  "seed": 42,
+  "noise_std_rel": 0.01,
+  "total_train_seconds": 24.685162699999637,
+  "total_wall_seconds": 24.694218600008753,
+  "numeric_success": 0,
+  "symbolic_success": 0,
+  "total": 1,
+  "results": [
+    {
+      "target_id": "sin_plus",
+      "true_formula": "sin(x0) + x1",
+      "monotonic": false,
+      "final_train_mse": 0.00020729318202938884,
+      "holdout_mse": 6.899991989135742,
+      "mse_threshold": 0.05,
+      "numeric_ok": false,
+      "symbolic_ok": false,
+      "template_guess": "x0 * x1",
+      "template_mse": 6.77253532409668,
+      "eml_expression": "Re[eml(eml(-0.083338, (0.0698703*z0 + 0.0513372*z1 + 0.069428*z2 + -0.0813555*z3 + -0.0798544*z4 + -0.071239*z5 + -0.0439458*z6 + -0.0688527*z7)), eml(0.0525001, f_prev))]",
+      "simplified": null,
+      "steps": 4000,
+      "train_seconds": 24.685162699999637,
+      "best_val_mse": 0.00020729318202938884
+    }
+  ]
+}

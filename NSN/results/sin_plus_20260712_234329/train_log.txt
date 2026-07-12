@@ -1,0 +1,16 @@
+demo=sin_plus
+steps=800
+final_mse=2.818652e+00
+initial_mse=1.213736e+08
+
+--- tree ---
+EMLTree(depth=2, leaves=4, internal_nodes=3, root=eml(...))
+
+--- leaf summary ---
+leaf[0]: dominant=beta·z (w=(0.000,1.000,0.000)) alpha=-0.1064
+leaf[1]: dominant=beta·z (w=(0.000,1.000,0.000)) alpha=-0.0528
+leaf[2]: dominant=beta·z (w=(0.000,1.000,0.000)) alpha=0.2221
+leaf[3]: dominant=beta·z (w=(0.000,1.000,0.000)) alpha=-0.3179
+
+--- snapped expression ---
+Re[eml(eml((-0.122051*z0 + 0.135872*z1 + 0.128745*z2 + 0.0824783*z3), (-0.272161*z0 + 0.25185*z1 + 0.297297*z2 + 0.295472*z3)), eml((-0.0897534*z0 + 0.0790757*z1 + 0.0564267*z2 + -0.0659012*z3), (-0.0484149*z0 + 0.0465619*z1 + 0.0297262*z2 + -0.106501*z3)))]

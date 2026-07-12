@@ -1,0 +1,48 @@
+{
+  "phase": 2,
+  "seed": 42,
+  "noise_std_rel": 0.01,
+  "total_train_seconds": 81.10978400000022,
+  "total_wall_seconds": 81.11991899998975,
+  "numeric_success": 0,
+  "symbolic_success": 0,
+  "total": 2,
+  "results": [
+    {
+      "target_id": "feynman_I29_product",
+      "true_formula": "x0 * x1",
+      "monotonic": false,
+      "final_train_mse": 0.00047201081179082394,
+      "holdout_mse": 0.881995677947998,
+      "mse_threshold": 0.05,
+      "numeric_ok": false,
+      "symbolic_ok": false,
+      "template_guess": "sin(x0)",
+      "template_mse": 0.3666969835758209,
+      "eml_expression": "Re[eml(eml(-0.1005, (0.065525*z0 + 0.0606964*z1 + -0.0712053*z2 + 0.0682629*z3 + -0.0734549*z4 + 0.067556*z5)), eml((-0.069116*z0 + -0.0729501*z1 + 0.0503242*z2 + -0.0519518*z3 + 0.063374*z4 + -0.0578401*z5), (-0.0538961*z0 + -0.0614267*z1 + 0.0500162*z2 + -0.0665569*z3 + 0.0688631*z4 + -0.0695826*z5)))]",
+      "simplified": null,
+      "steps": 5000,
+      "train_seconds": 35.89856940000027,
+      "best_val_mse": 0.00047201081179082394,
+      "stopped_step": 5000
+    },
+    {
+      "target_id": "feynman_I9_inv_square",
+      "true_formula": "1 / x0^2",
+      "monotonic": true,
+      "final_train_mse": 4.505283832550049,
+      "holdout_mse": 4.544496536254883,
+      "mse_threshold": 0.01,
+      "numeric_ok": false,
+      "symbolic_ok": false,
+      "template_guess": "sin(x0)",
+      "template_mse": 3.953909397125244,
+      "eml_expression": "Re[eml(eml((0.0995431*z0 + -0.099647*z1 + -0.10529*z2 + -0.111017*z3 + 0.117153*z4 + 0.103872*z5), (0.596711*z0 + -0.55672*z1 + -0.538711*z2 + -0.579819*z3 + 0.62815*z4 + 0.462051*z5)), eml((0.0618113*z0 + -0.0507938*z1 + -0.0560917*z2 + -0.0191545*z3 + 0.0504816*z4 + 0.0576704*z5), -0.850906))]",
+      "simplified": null,
+      "steps": 6000,
+      "train_seconds": 45.21121459999995,
+      "best_val_mse": 4.505283832550049,
+      "stopped_step": 6000
+    }
+  ]
+}

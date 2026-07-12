@@ -39,15 +39,42 @@ def grpo_dependencies_available() -> bool:
         return False
 
 
+def completion_text(completion: Any) -> str:
+    """
+    Normalize TRL completion payloads to plain text.
+
+    TRL standard prompts -> completions are list[str].
+    Conversational format -> list[list[dict]] with 'content'.
+    """
+    if isinstance(completion, str):
+        return completion
+    if isinstance(completion, list):
+        if not completion:
+            return ""
+        first = completion[0]
+        if isinstance(first, str):
+            return first
+        if isinstance(first, dict):
+            return str(first.get("content", first.get("text", first)))
+    if isinstance(completion, dict):
+        return str(completion.get("content", completion.get("text", completion)))
+    return str(completion)
+
+
 def gsm8k_numeric_reward(
-    completions: list[list[dict[str, str]]],
-    answer: list[str],
+    completions: list[Any],
+    answer: list[str] | None = None,
     **kwargs: Any,
 ) -> list[float]:
     """Exact-match reward on GSM8K numeric answers (no math_verify dependency)."""
+    if answer is None:
+        answer = kwargs.get("answer") or kwargs.get("solution")
+    if answer is None:
+        raise ValueError("gsm8k_numeric_reward needs 'answer' column in dataset")
+
     rewards: list[float] = []
     for completion, gold_text in zip(completions, answer, strict=True):
-        pred_text = completion[0]["content"]
+        pred_text = completion_text(completion)
         pred = extract_numeric_answer(pred_text)
         gold = extract_numeric_answer(gold_text)
         rewards.append(1.0 if answers_match(pred, gold) else 0.0)

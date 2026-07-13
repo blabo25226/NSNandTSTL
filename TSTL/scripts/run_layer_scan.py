@@ -39,6 +39,30 @@ from r1_presets import (  # noqa: E402
 PRESETS: dict[str, R1Preset] = {"quick": QUICK, "standard": STANDARD, "full": FULL}
 
 
+class _Tee:
+    """Duplicate a stream to a log file so results survive disconnects."""
+
+    def __init__(self, stream, log_file) -> None:
+        self._stream = stream
+        self._log = log_file
+
+    def write(self, data: str) -> int:
+        self._stream.write(data)
+        self._log.write(data)
+        self._log.flush()
+        return len(data)
+
+    def flush(self) -> None:
+        self._stream.flush()
+        self._log.flush()
+
+
+def _resolve_dtype(name: str):
+    import torch
+
+    return {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}[name]
+
+
 def build_config(preset: R1Preset, args: argparse.Namespace) -> dict:
     return {
         "model": args.model,
@@ -51,6 +75,7 @@ def build_config(preset: R1Preset, args: argparse.Namespace) -> dict:
         "layer_stride": preset.layer_stride,
         "lr": args.lr,
         "seed": args.seed,
+        "dtype": args.dtype,
     }
 
 
@@ -62,11 +87,12 @@ def run_pipeline(args: argparse.Namespace, preset: R1Preset, out_dir: Path) -> N
     from llm_data import load_gsm8k_subset, to_grpo_rows
     from llm_eval import eval_model
     from llm_freeze import num_transformer_layers
-    from llm_profile import profile_layers_from_scores  # noqa: F401  (used via resume)
+    from llm_profile import save_run_report
     from llm_strategies import strategy_layer_indices
 
     out_dir.mkdir(parents=True, exist_ok=True)
     base_ckpt = out_dir / "base_model"
+    dtype = _resolve_dtype(args.dtype)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     if tokenizer.pad_token is None:
@@ -77,7 +103,7 @@ def run_pipeline(args: argparse.Namespace, preset: R1Preset, out_dir: Path) -> N
 
     def load_model(src: str) -> "torch.nn.Module":
         return AutoModelForCausalLM.from_pretrained(
-            src, torch_dtype=torch.bfloat16, device_map="auto"
+            src, torch_dtype=dtype, device_map="auto"
         )
 
     def make_config(layer_indices, output_dir, save_model):
@@ -129,17 +155,29 @@ def run_pipeline(args: argparse.Namespace, preset: R1Preset, out_dir: Path) -> N
     print(f"best C = {max(result.contributions.values()):.3f}")
 
     # §4 strategies: Only Bk / Mid-k vs Full (uses scanned contributions).
+    strategies: dict[str, dict] = {}
     for strat in ("only_bk", "mid_k"):
         idx = strategy_layer_indices(strat, n_layers, args.strategy_k, contributions=result.contributions)
         m = load_model(str(base_ckpt))
         run_grpo_train(m, grpo_rows, make_config(idx, out_dir / f"strategy_{strat}", False))
         s = eval_model(m, eval_split, tokenizer, max_new_tokens=preset.max_completion_length)
         print(f"strategy {strat} (layers={idx}): S = {s:.4f}")
+        strategies[strat] = {"layers": idx, "score": s}
         (out_dir / f"strategy_{strat}.json").write_text(
-            json.dumps({"strategy": strat, "layers": idx, "score": s}, indent=2),
+            json.dumps({"strategy": strat, **strategies[strat]}, indent=2),
             encoding="utf-8",
         )
 
+    # One consolidated report (report.json + report.md) on top of the per-artifact files.
+    save_run_report(
+        out_dir,
+        config=build_config(preset, args),
+        s_base=s_base,
+        s_full=s_full,
+        s_per_layer=result.s_per_layer,
+        contributions=result.contributions,
+        strategies=strategies,
+    )
     print(f"results -> {result.out_dir}")
 
 
@@ -151,6 +189,12 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=1e-5)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--strategy-k", type=int, default=3, help="k for Only Bk / Mid-k")
+    parser.add_argument(
+        "--dtype",
+        choices=["bfloat16", "float16", "float32"],
+        default="bfloat16",
+        help="Model compute dtype (use float16 on GPUs without bf16 support)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Print plan and exit (no GPU/HF)")
     args = parser.parse_args()
 
@@ -179,7 +223,18 @@ def main() -> None:
             )
         return
 
-    run_pipeline(args, preset, out_dir)
+    # Auto-save: mirror stdout/stderr to out_dir/run.log so results survive disconnects.
+    out_dir.mkdir(parents=True, exist_ok=True)
+    log_path = out_dir / "run.log"
+    with open(log_path, "a", encoding="utf-8") as log_file:
+        orig_out, orig_err = sys.stdout, sys.stderr
+        sys.stdout = _Tee(orig_out, log_file)
+        sys.stderr = _Tee(orig_err, log_file)
+        try:
+            print(f"# run.log -> {log_path}")
+            run_pipeline(args, preset, out_dir)
+        finally:
+            sys.stdout, sys.stderr = orig_out, orig_err
 
 
 if __name__ == "__main__":

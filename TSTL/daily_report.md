@@ -43,3 +43,10 @@
   - **E4（中間層集中）**: 8シード平均 C(k) は全層 ≈0.92–0.98 で**ほぼフラット**。単一層が全層学習の 9 割超を回復（「1層でほぼ足りる」は頑健に再現）。ただし argmax は **入力層 k=0 が 5/7**、中間深さ(35–65%)は 2/7 のみ → **論文の中間層集中は再現せず**。seed2 は S_full=0.61 と未収束で外れ値。
   - **E8（∥Δθ∥ vs C(k)）**: 相関はシード間で符号バラバラ（Pearson −0.47〜+0.69）、平均 **Pearson 0.02 / Spearman −0.11**（seed2 除外で −0.08/−0.18）。**∥Δθ∥ は C(k) と無相関**＝論文§5の中核洞察（寄与は重み変化量では説明されない）を玩具スケールで再現。∥Δθ‖ の層間相対ばらつきは平均 0.46。
 - **メモ**: いずれも玩具（教師あり・非LLM・非GRPO）。実 LLM+GRPO での E3/E4/E5/E6/E7 は GPU+HF 実行が必須で未達。pytest は引き続き緑（相関ヘルパ含む）。
+
+## 2026-07-13 07:30
+
+- **作業内容**: GPU(Windows) 実行手順書を作成し、R1 CLI の実行結果を自動保存するよう補強。`run_layer_scan.py` に stdout/stderr を `run.log` へ複製する Tee、`--dtype {bfloat16,float16,float32}`、戦略スコアの集約を追加。`llm_profile.save_run_report` を新設し `report.json`/`report.md`（S_base/S_full・C(k) 表・Full vs Only Bk/Mid-k 比較）を 1 か所に出力。
+- **変更ファイル**: `TSTL/texts/GPU実行手順書.md`(新規), `TSTL/scripts/run_layer_scan.py`, `TSTL/src/llm_profile.py`, `TSTL/tests/test_run_report.py`(新規), `TSTL/daily_report.md`
+- **結果**: pytest 48 件 PASS。`--dry-run` は CPU で正常（dtype も反映）。手順書は Windows 前提（venv・CUDA torch・実行/再開・結果の場所・トラブルシュート・R1 判定 E2/E3/E5）。
+- **メモ**: 自動保存はローカル + run.log まで（自動 git push はしない方針）。実 GPU 実行はユーザー PC 側。

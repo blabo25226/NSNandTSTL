@@ -45,3 +45,9 @@
 - **作業内容**: GPU 不要で可能な TSTL 実証項目の玩具版を CPU 実行。E4（中間層集中の多シード追試, tiny-TF 8シード）と E8（∥Δθ∥ vs C(k) 非相関）。
 - **変更ファイル**: `TSTL/` 配下（詳細は `TSTL/daily_report.md`）
 - **メモ**: E4=「1層でほぼ足りる」は頑健に再現も中間層集中は再現せず（入力層優位）。E8=∥Δθ∥ と C(k) は無相関（平均 Pearson 0.02）で論文§5を玩具再現。実 LLM+GRPO 版は GPU+HF 待ち。
+
+## 2026-07-13 07:30
+
+- **作業内容**: GPU(Windows) 実行手順書 `TSTL/texts/GPU実行手順書.md` を作成。R1 CLI の実行結果を自動保存（run.log の Tee、report.json/md の集約出力、--dtype 追加）。
+- **変更ファイル**: `TSTL/` 配下（詳細は `TSTL/daily_report.md`）
+- **メモ**: 自動保存はローカル+run.logまで。pytest 48件 PASS。

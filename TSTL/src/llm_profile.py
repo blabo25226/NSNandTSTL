@@ -117,6 +117,64 @@ def save_layer_scan(
     return out_dir
 
 
+def save_run_report(
+    out_dir: Path,
+    *,
+    config: dict,
+    s_base: float,
+    s_full: float,
+    s_per_layer: dict[int, float],
+    contributions: dict[int, float],
+    strategies: dict[str, dict] | None = None,
+) -> Path:
+    """
+    Write one consolidated report (report.json + report.md) for a full R1 run.
+
+    ``strategies`` maps a strategy name (e.g. "only_bk") to
+    ``{"layers": [...], "score": float}``. Complements the per-artifact files
+    already written by ``save_layer_scan`` so a single file has everything.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    strategies = strategies or {}
+    finite = {k: v for k, v in contributions.items() if v == v}
+    best_k = max(finite, key=lambda k: finite[k]) if finite else None
+
+    payload = {
+        "config": config,
+        "s_base": s_base,
+        "s_full": s_full,
+        "best_layer": best_k,
+        "s_per_layer": {str(k): v for k, v in s_per_layer.items()},
+        "contributions": {str(k): v for k, v in contributions.items()},
+        "strategies": strategies,
+    }
+    (out_dir / "report.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    lines = [
+        "# TSTL R1 run report",
+        "",
+        f"- model: {config.get('model', '?')}",
+        f"- preset: {config.get('preset', '?')}",
+        f"- S_base: {s_base:.4f}",
+        f"- S_full: {s_full:.4f}",
+    ]
+    if best_k is not None:
+        lines.append(f"- best layer: k={best_k} (C={contributions[best_k]:.3f})")
+    lines += ["", "## Layer contribution C(k)", "", "| k | S_k | C(k) |", "|---|-----|------|"]
+    for k in sorted(contributions):
+        sk = s_per_layer.get(k, float("nan"))
+        lines.append(f"| {k} | {sk:.4f} | {contributions[k]:.4f} |")
+
+    if strategies:
+        lines += ["", "## Strategies vs Full", "", "| strategy | layers | S |", "|----------|--------|---|"]
+        lines.append(f"| full | (all) | {s_full:.4f} |")
+        for name, info in strategies.items():
+            lines.append(f"| {name} | {info.get('layers')} | {info.get('score', float('nan')):.4f} |")
+    lines.append("")
+    (out_dir / "report.md").write_text("\n".join(lines), encoding="utf-8")
+    return out_dir
+
+
 def profile_layers_from_scores(
     s_base: float,
     s_full: float,

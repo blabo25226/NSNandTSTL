@@ -211,3 +211,58 @@ NaN loss で停止する。論文の「D≥5 で学習成功率が急落」を**
 snapped MSE も深い木（D4/D6）で 1e17 級に発散し、export の数値不安定性を示す。
 成功率（snapped≤5e-2）は本短ステップ設定では全深さで低く、崩壊の主指標は有限率。
 本番評価では D≤4 推奨（`RECOMMENDED_MAX_DEPTH=4`, EMLTreeHead は >4 で警告）。
+
+## 追加フェーズ A–D（論文カバレッジ完成, 2026-07-13）
+
+### B. FLOPs/node コスト解析（`src/cost.py`, `scripts/flops_analysis.py`）
+
+`eml(x,y)=exp(x)-ln(y)` を複素演算で評価する際の超越関数（exp・sin・cos・log・atan2・sqrt）を
+FLOP 等価重みで合算し、**論文の ≈111 FLOPs/node を再現**（transcendental=111、+arithmetic で total=123）。
+`head_flops(depth)`＝`(2^D-1)` ノード＋葉アフィン、`mlp_flops()` で MLP trunk と対比。
+超越関数の重みは HW 依存の見積りである旨を明記（内訳を出力し調整可能）。FPGA/アナログの実機合成は範囲外。
+
+### C. `sum` 改善（`trainer.py`, `sr_eval.py`）
+
+`sum` を **zero モード depth 3** に変更 → snapped holdout MSE **3.09e-4**（閾値 1e-2 合格。旧 depth2 は 0.025 不合格）。
+**f_prev の parent モード（K≥2）は学習モードとしては数値的に不安定**（square/product を破壊、sum は NaN loss）。
+→ 線形和 sum を救うのは f_prev 帰還ではなく**木の深さ**。parent モードの価値は②の忠実 export（記号表現力）に限定。
+`TrainConfig` に `f_prev_mode`/`f_prev_passes`、`sr_eval` に `--f-prev-mode`/`--f-prev-passes` と
+NaN 耐性（1 式の学習失敗で phase 全体を止めない）を追加。
+
+### A+D. 実 Feynman ベンチ × baseline × 多シード（`feynman.py`, `baselines.py`, `feynman_benchmark.py`）
+
+実 Feynman 方程式 12 式（AI Feynman レンジ）を `SRTarget` として定義。baseline は MLP・最小 EQL・任意 KAN（pykan）。
+NSN 深さ{2,3,4} vs baseline を多シードで比較し R²/MSE/複雑度/時間/成功率を集計。
+**NSN は feature_dim=4 が安定**（d=6 は βᵀz が大きく exp/ln が発散）。
+
+代表 5 式（I.12.1/I.14.4/I.25.13/I.14.3/I.34.8）× 深さ{2,3,4} × seed{0,1}、3000 step
+（`results/feynman_bench_20260713_053420/`）:
+
+| 手法 | 成功率(R²≥0.99) | 平均 R² |
+|------|------------------|---------|
+| MLP | **1.00** | 0.999 |
+| EQL | **1.00** | 0.997 |
+| NSN d2 | 0.40 | 不安定 |
+| NSN d3 | 0.00 | 発散（R²→−1e14） |
+| NSN d4 | 0.10 | ほぼ発散 |
+
+**正直な負の実証**: 本再現では NSN の EML head は Feynman で MLP/EQL に届かず、**数値的に脆く深いほど発散**する
+（④ D≥5 崩壊と整合）。論文の「EQL/KAN に対する優位性」は**均一予算・無チューニングでは再現できず**、
+式別の入念なチューニング、あるいは論文が本来狙う専用 EML ハードウェアが前提と示唆される。
+ハーネスは予算引数化済みで、`--all --seeds 0 1 2` 等でフル実行に拡張可能。
+
+### Phase 3 再評価（本環境 torch 2.13/py3.11, seed 42, `results/sr_phase3_20260713_053541/`）
+
+| target | snapped MSE | symbolic OK |
+|--------|-------------|-------------|
+| square | 1.9e-4 | ✅ |
+| product | 1.3e-4 | ✅ |
+| sum | **3.1e-4** | ✅（depth3 で改善、旧 0.025 不合格を解消） |
+| exp | 1.2e-4 | ✅ |
+| sin | 6.8e-4 | ✅ |
+| sin_plus | 2.6e0 | ❌（**シード敏感**: seed 1/7 合格 0.01–0.03、seed 0/42/123 不合格。成功率 ~40%） |
+| **合計** | | **5/6** |
+
+`sum` を depth3 で救済して合格。残る `sin_plus`（2 項・非単調）はシード次第で合否が変わる**不安定ターゲット**で、
+NSN head の数値的脆さ（Feynman ベンチの負の結果と同根）を示す。以前の環境（py3.12）では seed42 で合格していたが、
+torch/Python バージョン差で挙動が変わる程度に脆い。

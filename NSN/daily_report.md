@@ -93,3 +93,30 @@
   **有限率（NaN なし）が D≥5 で急落** — D2/3/4=**1.00**, D5=**0.50**, D6=**0.25**（NaN loss で学習破綻）。
   論文の「D≥5 で学習成功率が急落」を**数値破綻（NaN）として再現**。snapped MSE も D4/D6 で 1e17 級に発散。
   成功率（snapped≤5e-2）は短ステップ設定のため全深さで低く、崩壊の識別子は有限率。
+
+## 2026-07-13 05:40
+
+- **作業内容**: 論文カバレッジ完成の追加フェーズ（残ギャップ A–D）を実装・実験。
+  - **B. FLOPs/node コスト解析**: `src/cost.py`。`eml_node_flops()` が超越関数の重み付き合算で
+    **論文の ≈111 FLOPs/node を再現**（transcendental=111, +arithmetic=123 total）。`head_flops(depth)`・
+    `mlp_flops()`・`scripts/flops_analysis.py`。ハードウェア効率主張の software 再現可能部分を定量化
+    （FPGA/アナログ実機合成は範囲外）。
+  - **C. `sum` 改善**: `sum` を **zero モード depth 3** に変更 → snapped MSE **3.09e-4**（閾値 1e-2 合格。
+    旧 0.025 不合格を解消）。**重要発見**: f_prev の parent モード（K≥2）は**学習モードとしては数値的に不安定**
+    （square/product を破壊、sum は NaN）。sum を救うのは f_prev ではなく**木の深さ**。parent の価値は②の
+    忠実 export に限定と整理。`trainer.TrainConfig` に `f_prev_mode`/`f_prev_passes`、`sr_eval` に CLI と
+    NaN 耐性（1 式失敗で phase 全体を落とさない）を追加。
+  - **A+D. 実 Feynman ベンチ×baseline×多シード**: `src/feynman.py`（実 Feynman 12 式, AI Feynman レンジ）、
+    `src/baselines.py`（MLP・最小 EQL・任意 KAN）、`scripts/feynman_benchmark.py`（NSN 深さ{2,3,4} vs baseline、
+    R²/MSE/複雑度/時間/成功率、多シード集計）。**NSN は feature_dim=4 が安定**（d=6 は exp/ln 発散）。
+    代表 5 式×深さ{2,3,4}×seed{0,1} 結果（`results/feynman_bench_20260713_053420/`）:
+    **MLP=EQL は成功率 1.00（R²≈0.999）、NSN は d2=0.40 / d3=0.00 / d4=0.10** と脆く、深いほど発散。
+    → 論文の優位性主張は**そのままでは再現できず**、式別チューニング or 専用ハード前提を示唆（④ D≥5 崩壊と整合）。
+    正直な負の実証結果として記録。
+- **変更ファイル**: `NSN/src/{cost,feynman,baselines,trainer}.py`,
+  `NSN/scripts/{flops_analysis,feynman_benchmark,sr_eval}.py`,
+  `NSN/tests/{test_cost,test_feynman}.py`, `NSN/texts/SR検証計画.md`, `NSN/daily_report.md`
+- **メモ**: pytest **50 件 PASS**。phase 3（zero, seed42, `results/sr_phase3_20260713_053541/`）は
+  `sum` 合格で **symbolic 5/6**。残る `sin_plus` は**シード敏感**（seed 1/7 で合格 0.01–0.03、seed 0/42/123 で
+  不合格 → 成功率 ~40%）。これは本環境（torch 2.13/py3.11）での NSN head の**数値的脆さ**を示し、
+  Feynman ベンチの負の結果と整合。以前の環境で sin_plus が合格していたのも同じ脆さの裏返し。

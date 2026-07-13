@@ -150,11 +150,12 @@ def resume_layer_scan(
     s_base: float,
     s_full: float,
     config: dict,
+    layer_indices: list[int] | None = None,
 ) -> LayerScanResult:
     """
     Run per-layer training, skipping layers already in contributions.json.
 
-    Intended for Colab sessions that may disconnect mid-scan.
+    ``layer_indices`` limits which k to train (default: 0 .. num_layers-1).
     """
     contrib_path = out_dir / "contributions.json"
     s_per_layer: dict[int, float] = {}
@@ -162,7 +163,8 @@ def resume_layer_scan(
         data = json.loads(contrib_path.read_text(encoding="utf-8"))
         s_per_layer = {int(k): float(v) for k, v in data.get("s_per_layer", {}).items()}
 
-    for k in range(num_layers):
+    indices = layer_indices if layer_indices is not None else list(range(num_layers))
+    for k in indices:
         if k in s_per_layer:
             continue
         s_per_layer[k] = train_and_eval_layer(k)

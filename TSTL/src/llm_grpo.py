@@ -27,6 +27,7 @@ class GrpoRunConfig:
     seed: int = 42
     train_layer_indices: list[int] | None = None  # None = full model
     tokenizer: Any | None = None
+    save_model: bool = True
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -170,5 +171,6 @@ def run_grpo_train(
         tokenizer=config.tokenizer,
     )
     trainer.train()
-    trainer.save_model(str(config.output_dir))
+    if config.save_model:
+        trainer.save_model(str(config.output_dir))
     return config.output_dir

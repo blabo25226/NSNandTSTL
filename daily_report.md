@@ -21,3 +21,33 @@
 - **作業内容**: ユーザー指摘に基づき `README.md` の記号説明を修正。n=サンプルサイズ（行数・標本の個数）、1標本=観測1件と明記。「サンプル数」表記を廃止。
 - **変更ファイル**: `README.md`, `daily_report.md`
 - **メモ**: なし
+
+## 2026-07-13 02:45
+
+- **作業内容**: TSTL Phase 0-B 向け作業計画書を `TSTL/texts/作業計画書.md` に作成。ブランチ `20260713_create_TSTL`。コーディングはユーザー承諾後。
+- **変更ファイル**: `TSTL/texts/作業計画書.md`, `TSTL/daily_report.md`, `daily_report.md`
+- **メモ**: 詳細ログは `TSTL/daily_report.md` を参照。
+
+## 2026-07-13 02:57
+
+- **作業内容**: TSTL Phase 0-B コーディング完了（層凍結・C(k)・戦略・MLP ベンチ・CLI）。pytest 11 件 PASS。
+- **変更ファイル**: `TSTL/` 配下（src, tests, scripts, requirements.txt）
+- **メモ**: 詳細は `TSTL/daily_report.md`
+
+## 2026-07-13 05:40
+
+- **作業内容**: TSTL 論文再現（Phase R1）の続き。Claude Code クラウド環境が GPU なし・HuggingFace ブロックと判明したため、二分割で対応。(1) GPU 不要部分をこの環境で計算（MLP 層寄与の複数シード集約＋スクラッチ小型 Transformer の層スキャン）、(2) GPU 実機で 1 コマンド実行できる R1 パイプライン CLI を整備。
+- **変更ファイル**: `TSTL/` 配下（詳細は `TSTL/daily_report.md`）
+- **メモ**: 小型 Transformer で C(k) を CPU 実測（入力層最弱・単層で全層学習をほぼ回復＝TSTL の定性再現）。GRPO 本体は GPU+HF マシン待ち。
+
+## 2026-07-13 06:55
+
+- **作業内容**: GPU 不要で可能な TSTL 実証項目の玩具版を CPU 実行。E4（中間層集中の多シード追試, tiny-TF 8シード）と E8（∥Δθ∥ vs C(k) 非相関）。
+- **変更ファイル**: `TSTL/` 配下（詳細は `TSTL/daily_report.md`）
+- **メモ**: E4=「1層でほぼ足りる」は頑健に再現も中間層集中は再現せず（入力層優位）。E8=∥Δθ∥ と C(k) は無相関（平均 Pearson 0.02）で論文§5を玩具再現。実 LLM+GRPO 版は GPU+HF 待ち。
+
+## 2026-07-13 07:30
+
+- **作業内容**: GPU(Windows) 実行手順書 `TSTL/texts/GPU実行手順書.md` を作成。R1 CLI の実行結果を自動保存（run.log の Tee、report.json/md の集約出力、--dtype 追加）。
+- **変更ファイル**: `TSTL/` 配下（詳細は `TSTL/daily_report.md`）
+- **メモ**: 自動保存はローカル+run.logまで。pytest 48件 PASS。

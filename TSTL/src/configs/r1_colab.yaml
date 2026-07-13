@@ -1,0 +1,17 @@
+# TSTL Phase R1 — Colab (T4 16GB) defaults
+model_name: Qwen/Qwen2.5-0.5B-Instruct
+dataset: openai/gsm8k
+train_subset: 32
+eval_subset: 16
+layer_stride: 4
+grpo:
+  learning_rate: 1.0e-5
+  num_train_steps: 25
+  per_device_batch_size: 1
+  gradient_accumulation_steps: 4
+  num_generations: 2
+  max_completion_length: 64
+  seed: 42
+output:
+  drive_mount: true
+  checkpoint_root: /content/drive/MyDrive/TSTL/r1

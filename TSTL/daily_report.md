@@ -34,3 +34,12 @@
 - **変更ファイル**: `TSTL/src/tiny_transformer.py`, `TSTL/src/llm_strategies.py`, `TSTL/src/llm_eval.py`, `TSTL/scripts/{run_tiny_transformer_scan,aggregate_profiles,run_layer_scan}.py`, `TSTL/tests/test_{tiny_transformer,llm_strategies,llm_freeze_hf}.py`, `TSTL/notebooks/{tstl_r1_colab.ipynb,colab_setup.py}`, `TSTL/texts/論文再現計画書.md`, `TSTL/results/*`
 - **結果**: pytest **41 件 PASS**（CPU）。小型 Transformer 層寄与（seed42/0 平均, 6層）: C(k)=[0.62, 0.89, 0.95, 0.91, **1.00**, 0.98]。**入力層(k=0)が最弱**、中〜後段の単一層が全層学習をほぼ回復（C≈1.0）=TSTL の定性的特徴（入出力端は低寄与・単層で大部分回復）を CPU で再現。GRPO 本体は GPU+HF マシンで `python scripts/run_layer_scan.py --preset quick` を実行予定（`--dry-run` は CPU 動作確認済み）。
 - **メモ**: MLP（浅い回帰）では中間層集中は出ず入力隣接層が支配的。論文の中間層集中は深い事前学習 Transformer 由来と解釈。次段は GPU 実機での R1 実行、または NSN Phase 1（trunk への層寄与）。
+
+## 2026-07-13 06:55
+
+- **作業内容**: GPU 不要でできる論文実証項目の玩具版を CPU 実行（tiny-TF, 6層, 8シード）。**E4 中間層集中**の追試と **E8 ∥Δθ_k∥ vs C(k)** 非相関を実施。共通化のため学習ループを `tiny_transformer.train_model` に集約、相関ヘルパ `utils.pearson_corr/spearman_corr` を追加、`scripts/weight_change_vs_contribution.py`（E8）を新規作成。
+- **変更ファイル**: `TSTL/src/{tiny_transformer,utils}.py`, `TSTL/scripts/{run_tiny_transformer_scan,weight_change_vs_contribution}.py`, `TSTL/tests/test_utils_corr.py`, `TSTL/results/{tstl_tiny_tf_seed*,tstl_e8_seed*,tinytf8_aggregate*,tinytf7_noSeed2_aggregate*,tinytf_e8_aggregate*}`
+- **結果**:
+  - **E4（中間層集中）**: 8シード平均 C(k) は全層 ≈0.92–0.98 で**ほぼフラット**。単一層が全層学習の 9 割超を回復（「1層でほぼ足りる」は頑健に再現）。ただし argmax は **入力層 k=0 が 5/7**、中間深さ(35–65%)は 2/7 のみ → **論文の中間層集中は再現せず**。seed2 は S_full=0.61 と未収束で外れ値。
+  - **E8（∥Δθ∥ vs C(k)）**: 相関はシード間で符号バラバラ（Pearson −0.47〜+0.69）、平均 **Pearson 0.02 / Spearman −0.11**（seed2 除外で −0.08/−0.18）。**∥Δθ∥ は C(k) と無相関**＝論文§5の中核洞察（寄与は重み変化量では説明されない）を玩具スケールで再現。∥Δθ‖ の層間相対ばらつきは平均 0.46。
+- **メモ**: いずれも玩具（教師あり・非LLM・非GRPO）。実 LLM+GRPO での E3/E4/E5/E6/E7 は GPU+HF 実行が必須で未達。pytest は引き続き緑（相関ヘルパ含む）。

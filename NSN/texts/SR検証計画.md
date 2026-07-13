@@ -266,3 +266,15 @@ NSN 深さ{2,3,4} vs baseline を多シードで比較し R²/MSE/複雑度/時�
 `sum` を depth3 で救済して合格。残る `sin_plus`（2 項・非単調）はシード次第で合否が変わる**不安定ターゲット**で、
 NSN head の数値的脆さ（Feynman ベンチの負の結果と同根）を示す。以前の環境（py3.12）では seed42 で合格していたが、
 torch/Python バージョン差で挙動が変わる程度に脆い。
+
+## ベースラインゲート（TSTL 統合前, 2026-07-13）
+
+`scripts/baseline_gate_eval.py` による多シード評価。詳細は `texts/再現報告.md`。
+
+| protocol | Gate A (80%/式) | Gate C (degrade≤1.5) |
+|----------|-----------------|----------------------|
+| `full` | **FAIL**（exp のみ 100%、他 20–60%） | **PASS**（中央値 1.0） |
+| `freeze` | FAIL | PASS |
+| `trunk_first` | FAIL（全式 0%） | FAIL |
+
+推奨ベースライン: **`full`**。TSTL 層プロファイルは `exp` × seed `{42, 7}` から着手。

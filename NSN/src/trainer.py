@@ -30,6 +30,8 @@ class TrainConfig:
     polish_lr: float = 1e-4
     f_prev_mode: str = "zero"
     f_prev_passes: int = 1
+    freeze_trunk_after_search: bool = False
+    trunk_only_search: bool = False
 
 
 @dataclass
@@ -91,6 +93,25 @@ def _config_for_target(target: SRTarget, base: TrainConfig) -> TrainConfig:
         cfg.head_depth = 2
         cfg.steps = 5000
         cfg.lr = 2e-3
+    elif target.phase == 5:
+        # Full Feynman CSV benchmark (variable-count bands).
+        if target.input_dim == 1:
+            cfg.feature_dim = 4
+            cfg.head_depth = 2
+            cfg.steps = 5000
+        elif target.input_dim == 2:
+            cfg.feature_dim = 4
+            cfg.head_depth = 2
+            cfg.steps = 5000
+        elif target.input_dim == 3:
+            cfg.feature_dim = 6
+            cfg.head_depth = 2
+            cfg.steps = 6000
+        else:
+            cfg.feature_dim = 6
+            cfg.head_depth = 3
+            cfg.steps = 8000
+        cfg.lr = 2e-3
     elif target.input_dim == 1:
         cfg.feature_dim = 4
         cfg.head_depth = 2
@@ -139,6 +160,8 @@ def train_target(target: SRTarget, base_config: TrainConfig | None = None) -> tu
             weight_decay=cfg.weight_decay,
             leaf_softmax_mode=leaf_mode,
             seed=cfg.seed,
+            freeze_trunk_after_search=cfg.freeze_trunk_after_search,
+            trunk_only_search=cfg.trunk_only_search,
         )
         pipe = run_odrzywolek_pipeline(model, x, y, pipe_cfg)
         elapsed = time.perf_counter() - t0

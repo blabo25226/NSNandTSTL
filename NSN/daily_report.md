@@ -120,3 +120,29 @@
   `sum` 合格で **symbolic 5/6**。残る `sin_plus` は**シード敏感**（seed 1/7 で合格 0.01–0.03、seed 0/42/123 で
   不合格 → 成功率 ~40%）。これは本環境（torch 2.13/py3.11）での NSN head の**数値的脆さ**を示し、
   Feynman ベンチの負の結果と整合。以前の環境で sin_plus が合格していたのも同じ脆さの裏返し。
+
+## 2026-07-13 15:22
+
+- **作業内容**: TSTL 統合前の NSN ベースライン整備計画書を作成。ゲート条件（Phase 3 五式×5 seed で symbolic 80%、sin_plus は任意記録）、スコープ（Feynman/TSTL 本体は対象外）、実装ステップ（baseline_gate_eval、trunk 層 API、二段階学習オプション）を記載。ユーザー承諾後にコーディング開始。
+- **変更ファイル**: `NSN/texts/NSN整備計画_TSTL統合前.md`, `NSN/daily_report.md`
+- **メモ**: 承諾待ち。§10 のチェックリストにコメントいただくまで実装に入らない。
+
+## 2026-07-13 15:35
+
+- **作業内容**: §10 承諾を受け Step 1–3 を実装。`baseline_gate.py`（ゲート定義・判定）、`scripts/baseline_gate_eval.py`（多シード評価）、`trunk.py`（層凍結 API）、`pipeline.py`（`trunk_only_search`）、`trainer.py`（プロトコルフラグ伝播）。テスト 8 件追加。ルート `data/FeynmanEquations.csv` を計画書に追記。
+- **変更ファイル**: `NSN/src/{baseline_gate,trunk,pipeline,trainer}.py`, `NSN/scripts/baseline_gate_eval.py`, `NSN/tests/{test_baseline_gate,test_trunk_layers,test_pipeline}.py`, `NSN/texts/NSN整備計画_TSTL統合前.md`, `NSN/daily_report.md`
+- **メモ**: pytest 58 件 PASS（+8）。次: 本番ゲート実行（6式×5 seed、`baseline_gate_eval.py`）→ Gate 未達なら `freeze`/`trunk_first` フォールバック → `再現報告.md`。
+
+## 2026-07-13 18:05
+
+- **作業内容**: Step 4–5 完了。ベースラインゲート本番: `full` 30 run（43 min）Gate A FAIL / Gate C PASS。フォールバック `freeze`（5式×5）・`trunk_first`（5式×5）も Gate A 未達（trunk_first は 0%・Gate C も FAIL）。`NSN/texts/再現報告.md` 作成。推奨プロトコル `full`、TSTL は `exp`×seed{42,7} から層プロファイル着手可と記載。
+- **変更ファイル**: `NSN/texts/再現報告.md`, `NSN/texts/NSN整備計画_TSTL統合前.md`, `NSN/daily_report.md`
+- **結果**: `results/baseline_gate_20260713_160538/`（full）, `164957/`（freeze）, `172906/`（trunk_first）
+- **メモ**: Gate A 未達はシード 0/1 系統失敗と整合。`trunk_first` は不採用。
+
+## 2026-07-13 21:45
+
+- **作業内容**: Feynman CSV 全式ベンチ実装・実行。`feynman_csv.py`（CSV 読込・eval サンプル・1% ガウシアン誤差）、`feynman_csv_benchmark.py`（固定/ノイズ考慮の両 status、JSON+MD レポート）、`trainer._config_for_target` に phase=5 変数数帯 HP。テスト 5 件追加。全 99 式本番（124.5 min）: 固定 ok **0%**、ノイズ考慮 ok **5.1%**（eml-sr 9.1% / PySR 50–60% 未達）。
+- **変更ファイル**: `NSN/src/{feynman_csv,trainer}.py`, `NSN/scripts/feynman_csv_benchmark.py`, `NSN/tests/test_feynman_csv.py`, `NSN/texts/再現報告.md`, `NSN/daily_report.md`
+- **結果**: `results/feynman_csv_20260713_193755/`（pilot 10 式）, `results/feynman_csv_20260713_214242/`（full 99 式）
+- **メモ**: pytest **64 件 PASS**。次: SR 精度改善（depth sweep / trunk 容量）または TSTL 層プロファイル着手。

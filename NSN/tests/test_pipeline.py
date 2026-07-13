@@ -30,8 +30,26 @@ def test_pipeline_runs_all_stages():
     assert result.final_mse < result.initial_mse
 
 
+def test_pipeline_trunk_only_search_runs():
+    set_seed(2)
+    x = torch.linspace(0.3, 1.5, 64).unsqueeze(1)
+    y = x.squeeze() ** 2
+    model = DNNEML.build(input_dim=1, feature_dim=4, head_depth=2, hidden_dim=32, num_layers=2)
+    cfg = OdrzywolekPipelineConfig(
+        total_steps=100,
+        search_steps=50,
+        harden_steps=30,
+        polish_steps=20,
+        lr=5e-3,
+        seed=2,
+        trunk_only_search=True,
+    )
+    result = run_odrzywolek_pipeline(model, x, y, cfg)
+    assert result.expression_eml.startswith("Re[eml(")
+    assert result.final_mse < float("inf")
+
+
 def test_pipeline_gumbel_mode():
-    set_seed(1)
     x = torch.rand(32, 2)
     y = x[:, 0] * x[:, 1]
     model = DNNEML.build(

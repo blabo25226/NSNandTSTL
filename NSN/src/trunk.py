@@ -40,6 +40,30 @@ class MLPTrunk(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
 
+    def linear_layers(self) -> list[nn.Linear]:
+        """All Linear submodules in order (for layer-selective training / TSTL profiling)."""
+        return [m for m in self.net if isinstance(m, nn.Linear)]
+
+    def set_trainable_linear_layers(self, indices: set[int] | None) -> None:
+        """
+        Enable gradients on selected Linear layers only.
+
+        indices=None trains every Linear layer; an empty set freezes the whole trunk.
+        ReLU activations have no parameters and are ignored.
+        """
+        for i, lin in enumerate(self.linear_layers()):
+            train = indices is None or i in indices
+            for p in lin.parameters():
+                p.requires_grad_(train)
+
+    def freeze_all(self) -> None:
+        for p in self.parameters():
+            p.requires_grad_(False)
+
+    def unfreeze_all(self) -> None:
+        for p in self.parameters():
+            p.requires_grad_(True)
+
     def linear_weights(self) -> tuple[torch.Tensor, torch.Tensor] | None:
         """
         Exact (W, b) with z = W x + b when the trunk is a single Linear layer.

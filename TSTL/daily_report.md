@@ -27,3 +27,10 @@
 - **作業内容**: Colab ノートブック修正。Cursor 拡張は nb のみ送信のため、セル1で git clone + `sys.path` + `pip install -r` を自動化。
 - **変更ファイル**: `TSTL/notebooks/tstl_r1_colab.ipynb`, `TSTL/daily_report.md`
 - **メモ**: エラー原因は `/content` に `requirements-r.txt` と `src/` が無かったこと。
+
+## 2026-07-13 05:40
+
+- **作業内容**: Claude Code クラウド環境が **GPU なし・HuggingFace ブロック**と判明（実機確認）。ユーザー指示で二分割対応。**(1) GPU なし再現**: MLP 層寄与を 4 シード再実行＋`aggregate_profiles.py` で集約（全シード k=0 ピーク=浅い MLP では中間層集中は出ない）。スクラッチ小型 Transformer（`tiny_transformer.py`＋`run_tiny_transformer_scan.py`, 6層/合成 modular running-sum）を CPU 実行し層スキャン。**(2) GPU 直前まで**: `run_layer_scan.py` をスタブから全パイプライン CLI に置換、`llm_strategies.py`(Only Bk/Mid-k)・`llm_eval.eval_model` 追加、HF 不要の `Qwen2Config` 凍結テスト追加、notebook/colab_setup を作業ブランチへ更新。
+- **変更ファイル**: `TSTL/src/tiny_transformer.py`, `TSTL/src/llm_strategies.py`, `TSTL/src/llm_eval.py`, `TSTL/scripts/{run_tiny_transformer_scan,aggregate_profiles,run_layer_scan}.py`, `TSTL/tests/test_{tiny_transformer,llm_strategies,llm_freeze_hf}.py`, `TSTL/notebooks/{tstl_r1_colab.ipynb,colab_setup.py}`, `TSTL/texts/論文再現計画書.md`, `TSTL/results/*`
+- **結果**: pytest **41 件 PASS**（CPU）。小型 Transformer 層寄与（seed42/0 平均, 6層）: C(k)=[0.62, 0.89, 0.95, 0.91, **1.00**, 0.98]。**入力層(k=0)が最弱**、中〜後段の単一層が全層学習をほぼ回復（C≈1.0）=TSTL の定性的特徴（入出力端は低寄与・単層で大部分回復）を CPU で再現。GRPO 本体は GPU+HF マシンで `python scripts/run_layer_scan.py --preset quick` を実行予定（`--dry-run` は CPU 動作確認済み）。
+- **メモ**: MLP（浅い回帰）では中間層集中は出ず入力隣接層が支配的。論文の中間層集中は深い事前学習 Transformer 由来と解釈。次段は GPU 実機での R1 実行、または NSN Phase 1（trunk への層寄与）。

@@ -33,3 +33,9 @@
 - **作業内容**: TSTL Phase 0-B コーディング完了（層凍結・C(k)・戦略・MLP ベンチ・CLI）。pytest 11 件 PASS。
 - **変更ファイル**: `TSTL/` 配下（src, tests, scripts, requirements.txt）
 - **メモ**: 詳細は `TSTL/daily_report.md`
+
+## 2026-07-13 05:40
+
+- **作業内容**: TSTL 論文再現（Phase R1）の続き。Claude Code クラウド環境が GPU なし・HuggingFace ブロックと判明したため、二分割で対応。(1) GPU 不要部分をこの環境で計算（MLP 層寄与の複数シード集約＋スクラッチ小型 Transformer の層スキャン）、(2) GPU 実機で 1 コマンド実行できる R1 パイプライン CLI を整備。
+- **変更ファイル**: `TSTL/` 配下（詳細は `TSTL/daily_report.md`）
+- **メモ**: 小型 Transformer で C(k) を CPU 実測（入力層最弱・単層で全層学習をほぼ回復＝TSTL の定性再現）。GRPO 本体は GPU+HF マシン待ち。

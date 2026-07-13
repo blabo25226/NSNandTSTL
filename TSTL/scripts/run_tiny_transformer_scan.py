@@ -18,9 +18,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-import torch  # noqa: E402
-import torch.nn as nn  # noqa: E402
-
 from llm_freeze import freeze_all_except_layers, unfreeze_all  # noqa: E402
 from llm_profile import profile_layers_from_scores  # noqa: E402
 from tiny_transformer import (  # noqa: E402
@@ -28,39 +25,9 @@ from tiny_transformer import (  # noqa: E402
     TinyConfig,
     make_dataset,
     token_accuracy,
+    train_model,
 )
 from utils import set_seed  # noqa: E402
-
-
-def train(
-    model: TinyCausalLM,
-    x: torch.Tensor,
-    y: torch.Tensor,
-    *,
-    steps: int,
-    lr: float,
-    batch_size: int,
-    seed: int,
-) -> None:
-    """Cross-entropy training over trainable params only (freeze applied upstream)."""
-    params = [p for p in model.parameters() if p.requires_grad]
-    opt = torch.optim.AdamW(params, lr=lr)
-    gen = torch.Generator().manual_seed(seed)
-    n = x.shape[0]
-    model.train()
-    for _ in range(steps):
-        idx = torch.randint(0, n, (batch_size,), generator=gen)
-        xb, yb = x[idx], y[idx]
-        opt.zero_grad()
-        logits = model(xb)
-        loss = nn.functional.cross_entropy(
-            logits.reshape(-1, logits.shape[-1]), yb.reshape(-1)
-        )
-        if not torch.isfinite(loss):
-            raise RuntimeError("NaN loss during training")
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(params, 1.0)
-        opt.step()
 
 
 def fresh_model(cfg: TinyConfig, init_state: dict, seed: int) -> TinyCausalLM:
@@ -106,7 +73,7 @@ def main() -> None:
             unfreeze_all(m)
         else:
             freeze_all_except_layers(m, layer_indices)
-        train(
+        train_model(
             m,
             x_train,
             y_train,

@@ -109,3 +109,39 @@ def token_accuracy(model: TinyCausalLM, x: torch.Tensor, y: torch.Tensor) -> flo
     logits = model(x)
     pred = logits.argmax(dim=-1)
     return (pred == y).float().mean().item()
+
+
+def train_model(
+    model: TinyCausalLM,
+    x: torch.Tensor,
+    y: torch.Tensor,
+    *,
+    steps: int,
+    lr: float,
+    batch_size: int,
+    seed: int,
+) -> None:
+    """
+    Cross-entropy training over trainable params only (freeze applied upstream).
+
+    Shared by the layer scan and the ‖Δθ‖ analysis so both use the exact same
+    optimization; the freeze policy is set by the caller before calling this.
+    """
+    params = [p for p in model.parameters() if p.requires_grad]
+    opt = torch.optim.AdamW(params, lr=lr)
+    gen = torch.Generator().manual_seed(seed)
+    n = x.shape[0]
+    model.train()
+    for _ in range(steps):
+        idx = torch.randint(0, n, (batch_size,), generator=gen)
+        xb, yb = x[idx], y[idx]
+        opt.zero_grad()
+        logits = model(xb)
+        loss = nn.functional.cross_entropy(
+            logits.reshape(-1, logits.shape[-1]), yb.reshape(-1)
+        )
+        if not torch.isfinite(loss):
+            raise RuntimeError("NaN loss during training")
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(params, 1.0)
+        opt.step()

@@ -1,0 +1,11 @@
+{
+  "model": "tiny_transformer",
+  "task": "modular_running_sum",
+  "n_layers": 6,
+  "d_model": 64,
+  "vocab_size": 7,
+  "seq_len": 16,
+  "steps": 3000,
+  "lr": 0.003,
+  "seed": 7
+}

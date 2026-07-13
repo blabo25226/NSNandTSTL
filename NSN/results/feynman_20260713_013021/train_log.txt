@@ -1,0 +1,19 @@
+demo=feynman
+target=feynman_I29_product
+formula=x0 * x1
+steps=5000
+final_mse=7.316447e-06
+initial_mse=1.414369e+10
+eval_mode=overfit (train == test)
+
+--- tree ---
+EMLTree(depth=2, leaves=4, internal_nodes=3, root=eml(...))
+
+--- leaf summary ---
+leaf[0]: dominant=alpha (w=(1.000,0.000,0.000)) alpha=-0.1001
+leaf[1]: dominant=beta·z (w=(0.000,1.000,0.000)) alpha=0.0791
+leaf[2]: dominant=beta·z (w=(0.000,1.000,0.000)) alpha=-0.0461
+leaf[3]: dominant=beta·z (w=(0.000,1.000,0.000)) alpha=-0.0233
+
+--- snapped expression ---
+Re[eml(eml(-0.100149, (0.0667273*z0 + 0.0599379*z1 + -0.0715997*z2 + 0.0677986*z3 + -0.0749722*z4 + 0.0680278*z5)), eml((-0.0735884*z0 + -0.0774466*z1 + 0.0546002*z2 + -0.0563475*z3 + 0.0673921*z4 + -0.0623129*z5), (-0.0627498*z0 + -0.0707723*z1 + 0.0591375*z2 + -0.0753286*z3 + 0.0767934*z4 + -0.077905*z5)))]

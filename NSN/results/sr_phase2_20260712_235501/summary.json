@@ -1,0 +1,39 @@
+{
+  "phase": 2,
+  "seed": 42,
+  "numeric_success": 1,
+  "symbolic_success": 1,
+  "total": 2,
+  "results": [
+    {
+      "target_id": "feynman_I29_product",
+      "true_formula": "x0 * x1",
+      "monotonic": false,
+      "final_train_mse": 0.00019380656885914505,
+      "holdout_mse": 0.004997122101485729,
+      "mse_threshold": 0.05,
+      "numeric_ok": true,
+      "symbolic_ok": true,
+      "template_guess": "x0 * x1",
+      "template_mse": 0.004997122101485729,
+      "eml_expression": "Re[eml(eml((-0.267675*z0 + -0.250943*z1 + 0.212522*z2 + -0.250075*z3 + 0.238951*z4 + -0.243283*z5), (0.321907*z0 + 0.331382*z1 + -0.263937*z2 + 0.304244*z3 + -0.302872*z4 + 0.297826*z5)), eml((-0.0943924*z0 + -0.117827*z1 + 0.168768*z2 + -0.17569*z3 + 0.101287*z4 + -0.173238*z5), (0.0943762*z0 + 0.101874*z1 + -0.180564*z2 + 0.176427*z3 + -0.0941379*z4 + 0.163894*z5)))]",
+      "simplified": null,
+      "steps": 2500
+    },
+    {
+      "target_id": "feynman_I9_inv_square",
+      "true_formula": "1 / x0^2",
+      "monotonic": true,
+      "final_train_mse": 4.505016803741455,
+      "holdout_mse": 4.632550239562988,
+      "mse_threshold": 0.01,
+      "numeric_ok": false,
+      "symbolic_ok": false,
+      "template_guess": "sin(x0)",
+      "template_mse": 4.040438175201416,
+      "eml_expression": "Re[eml(eml((0.0996084*z0 + -0.0997123*z1 + -0.1054*z2 + -0.111126*z3 + 0.117261*z4 + 0.103938*z5), (0.345337*z0 + -0.332894*z1 + -0.325173*z2 + -0.340778*z3 + 0.38027*z4 + 0.293818*z5)), eml((0.0618984*z0 + -0.0508586*z1 + -0.0561787*z2 + -0.0191968*z3 + 0.0505461*z4 + 0.0577575*z5), -0.509303))]",
+      "simplified": null,
+      "steps": 2500
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "phase": 1,
+  "seed": 0,
+  "numeric_success": 0,
+  "symbolic_success": 0,
+  "total": 1,
+  "results": [
+    {
+      "target_id": "sin_plus",
+      "true_formula": "sin(x0) + x1",
+      "monotonic": false,
+      "final_train_mse": 5735066624.0,
+      "holdout_mse": 18842511360.0,
+      "mse_threshold": 0.05,
+      "numeric_ok": false,
+      "symbolic_ok": false,
+      "template_guess": "x0 * x1",
+      "template_mse": 18842488832.0,
+      "eml_expression": "Re[eml(eml(eml(8.76304e-06, 9.80275e-05), eml((0.569231*z0 + 0.299864*z1 + -0.0166118*z2 + -0.257693*z3 + 0.170522*z4 + 0.182275*z5 + 0.0640092*z6 + -0.121261*z7), -1.00089)), eml(eml(-0.140536, (0.170018*z0 + -0.0834613*z1 + -0.173228*z2 + 0.0721602*z3 + -0.125359*z4 + -0.0955419*z5 + 0.160977*z6 + 0.117145*z7)), eml(0.0872255, f_prev)))]",
+      "simplified": null,
+      "steps": 4000
+    }
+  ]
+}

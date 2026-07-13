@@ -1,0 +1,13 @@
+demo=square
+steps=500
+final_mse=4.975192e-04
+initial_mse=1.158656e+10
+
+--- tree ---
+EMLTree(depth=2, leaves=4, internal_nodes=3, root=eml(...))
+
+--- leaf summary ---
+leaf[0]: dominant=beta·z (w=(0.141,0.738,0.120)) alpha=-0.1106
+leaf[1]: dominant=beta·z (w=(0.133,0.777,0.090)) alpha=0.0491
+leaf[2]: dominant=alpha (w=(0.433,0.254,0.313)) alpha=0.0481
+leaf[3]: dominant=gamma·f_prev (w=(0.203,0.383,0.414)) alpha=-0.0022

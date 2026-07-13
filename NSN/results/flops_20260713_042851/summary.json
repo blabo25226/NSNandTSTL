@@ -1,0 +1,82 @@
+{
+  "weights": {
+    "exp": 20.0,
+    "sin": 18.0,
+    "cos": 18.0,
+    "log": 20.0,
+    "atan2": 25.0,
+    "sqrt": 10.0,
+    "add": 1.0,
+    "mul": 1.0,
+    "cmp": 1.0
+  },
+  "eml_node": {
+    "transcendental_flops": 111.0,
+    "arithmetic_flops": 12.0,
+    "total_flops": 123.0,
+    "breakdown": {
+      "exp": 20.0,
+      "sin": 18.0,
+      "cos": 18.0,
+      "log": 20.0,
+      "atan2": 25.0,
+      "sqrt": 10.0,
+      "mul": 4.0,
+      "add": 4.0,
+      "cmp": 4.0
+    }
+  },
+  "mlp_trunk_dims": [
+    2,
+    64,
+    64,
+    6
+  ],
+  "mlp_trunk_flops": 9344.0,
+  "by_depth": [
+    {
+      "depth": 1,
+      "num_internal_nodes": 1,
+      "num_leaves": 2,
+      "eml_node_flops": 123.0,
+      "nodes_flops": 123.0,
+      "leaves_flops": 28.0,
+      "head_flops": 151.0,
+      "trunk_mlp_flops": 9344.0,
+      "total_dnn_eml_flops": 9495.0
+    },
+    {
+      "depth": 2,
+      "num_internal_nodes": 3,
+      "num_leaves": 4,
+      "eml_node_flops": 123.0,
+      "nodes_flops": 369.0,
+      "leaves_flops": 56.0,
+      "head_flops": 425.0,
+      "trunk_mlp_flops": 9344.0,
+      "total_dnn_eml_flops": 9769.0
+    },
+    {
+      "depth": 3,
+      "num_internal_nodes": 7,
+      "num_leaves": 8,
+      "eml_node_flops": 123.0,
+      "nodes_flops": 861.0,
+      "leaves_flops": 112.0,
+      "head_flops": 973.0,
+      "trunk_mlp_flops": 9344.0,
+      "total_dnn_eml_flops": 10317.0
+    },
+    {
+      "depth": 4,
+      "num_internal_nodes": 15,
+      "num_leaves": 16,
+      "eml_node_flops": 123.0,
+      "nodes_flops": 1845.0,
+      "leaves_flops": 224.0,
+      "head_flops": 2069.0,
+      "trunk_mlp_flops": 9344.0,
+      "total_dnn_eml_flops": 11413.0
+    }
+  ]
+}

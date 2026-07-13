@@ -8,7 +8,8 @@ import sys
 from pathlib import Path
 
 REPO_URL = "https://github.com/blabo25226/NSNandTSTL.git"
-BRANCH = "20260713_create_TSTL"
+# Branch that carries the R1 pipeline code (update to the default branch after merge).
+BRANCH = "claude/tstl-reproduction-coding-s267ic"
 CLONE_DIR = Path("/content/NSNandTSTL")
 DRIVE_REPO = Path("/content/drive/MyDrive/NSNandTSTL")
 

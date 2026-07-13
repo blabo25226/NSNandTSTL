@@ -16,8 +16,8 @@
 - **変更ファイル**: `README.md`, `daily_report.md`
 - **メモ**: なし
 
-## 2026-07-12 23:23
+## 2026-07-13 14:35
 
-- **作業内容**: ユーザー指摘に基づき `README.md` の記号説明を修正。n=サンプルサイズ（行数・標本の個数）、1標本=観測1件と明記。「サンプル数」表記を廃止。
-- **変更ファイル**: `README.md`, `daily_report.md`
-- **メモ**: なし
+- **作業内容**: `TSTL/docs/TSTL_jpn.md` を `TSTL/data/TSTL_jpn_fig/` の fig1–fig26（図1–9・表1–16）画像付きで完成。各図表に日本語キャプションを追加。付録 A–C を画像参照付きで拡充、参考文献を番号付きリストに整備。
+- **変更ファイル**: `TSTL/docs/TSTL_jpn.md`, `daily_report.md`
+- **メモ**: 画像パスは `../data/TSTL_jpn_fig/figN.png`（docs からの相対パス）。

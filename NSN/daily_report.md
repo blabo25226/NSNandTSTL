@@ -69,3 +69,80 @@
   - 結果（Phase 3, seed=42, 新定義）: **symbolic 5/6**（square/product/exp/sin/sin_plus 成功、sum のみ 0.025 で僅差不合格）。論文中核主張「スナップ後 head が忠実な閉形式」を head レベルで再現。
 - **変更ファイル**: `NSN/src/pipeline.py`, `eml_tree.py`, `snap.py`, `tests/test_eml_tree.py`, `texts/SR検証計画.md`, `NSN/daily_report.md`
 - **メモ**: pytest 39 件 PASS（gamma-mask テスト 2 件追加）。sum は EML 木で線形和を厳密表現しづらい表現力の限界（数値発散ではない）。次: 残る sum の改善（depth=3 or f_prev=parent の export 対応）か、Feynman DB 本番へ。
+
+## 2026-07-13 03:20
+
+- **作業内容**: 別 AI レビューの指摘②③④に対応（①実 Feynman DB×EQL/KAN は別途）。
+  - **② f_prev マスター公式の完全実装＋export 対応**: `parent` モードを **K 回反復（Jacobi）** に一般化
+    （`EMLTreeHead.f_prev_passes`, 既定 K=1 で後方互換）。葉 i の f_prev＝親 EML ノード出力という論文定義を
+    不動点として K 反復で近づける。`snap.export_symbolic_expression` を parent モードで分岐させ、γ ブランチを
+    親ノード式 `eml(兄弟対^(t-1))` に再帰置換（pass0 は const）。**one-hot 重みで export 文字列＝snapped forward が
+    厳密一致**することをテストで確認（K=1,2）。旧「1 ステップ近似・export 非対応」を解消。
+  - **③ trunk 解釈性（二層解釈の下半分）**: 新 `src/trunk_interpret.py`。`linear_readout`（線形 trunk は厳密
+    (W,b)・R²=1、非線形は最小二乗蒸留＋成分別 R²）、`compose_symbolic`（z(x) を head export へ合成し
+    **ŷ を x の単一閉形式**に）、`trunk_attribution`（線形 |W|／非線形 mean|∂z/∂x|）。`trunk.py` に
+    `linear_weights()` と `num_layers=1` 線形 trunk サポート。`scripts/trunk_interpret_eval.py` 追加。
+    線形 trunk では合成閉形式＝snapped model 出力が一致（R²=1）することを実機確認。
+  - **④ D≥5 破綻の検証準備**: `EMLTreeHead` の depth 上限を [1,4]→[1,8] に緩和（>4 は `warnings.warn`）。
+    `scripts/depth_sweep_eval.py` 追加（depth×seed の成功率・有限率・snapped MSE 中央値を集計）。
+- **変更ファイル**: `NSN/src/eml_tree.py`, `snap.py`, `model.py`, `trunk.py`, `src/trunk_interpret.py`(新),
+  `scripts/trunk_interpret_eval.py`(新), `scripts/depth_sweep_eval.py`(新),
+  `tests/test_eml_tree.py`, `tests/test_trunk_interpret.py`(新), `.gitignore`, `NSN/texts/SR検証計画.md`
+- **メモ**: pytest **44 件 PASS**（parent-export 忠実性・不動点残差・depth5・線形合成の 5 件追加）。
+  depth スイープ結果（sin/product × seed{0,1} × 1000 step, `results/depth_sweep_20260712_192811/`）:
+  **有限率（NaN なし）が D≥5 で急落** — D2/3/4=**1.00**, D5=**0.50**, D6=**0.25**（NaN loss で学習破綻）。
+  論文の「D≥5 で学習成功率が急落」を**数値破綻（NaN）として再現**。snapped MSE も D4/D6 で 1e17 級に発散。
+  成功率（snapped≤5e-2）は短ステップ設定のため全深さで低く、崩壊の識別子は有限率。
+
+## 2026-07-13 05:40
+
+- **作業内容**: 論文カバレッジ完成の追加フェーズ（残ギャップ A–D）を実装・実験。
+  - **B. FLOPs/node コスト解析**: `src/cost.py`。`eml_node_flops()` が超越関数の重み付き合算で
+    **論文の ≈111 FLOPs/node を再現**（transcendental=111, +arithmetic=123 total）。`head_flops(depth)`・
+    `mlp_flops()`・`scripts/flops_analysis.py`。ハードウェア効率主張の software 再現可能部分を定量化
+    （FPGA/アナログ実機合成は範囲外）。
+  - **C. `sum` 改善**: `sum` を **zero モード depth 3** に変更 → snapped MSE **3.09e-4**（閾値 1e-2 合格。
+    旧 0.025 不合格を解消）。**重要発見**: f_prev の parent モード（K≥2）は**学習モードとしては数値的に不安定**
+    （square/product を破壊、sum は NaN）。sum を救うのは f_prev ではなく**木の深さ**。parent の価値は②の
+    忠実 export に限定と整理。`trainer.TrainConfig` に `f_prev_mode`/`f_prev_passes`、`sr_eval` に CLI と
+    NaN 耐性（1 式失敗で phase 全体を落とさない）を追加。
+  - **A+D. 実 Feynman ベンチ×baseline×多シード**: `src/feynman.py`（実 Feynman 12 式, AI Feynman レンジ）、
+    `src/baselines.py`（MLP・最小 EQL・任意 KAN）、`scripts/feynman_benchmark.py`（NSN 深さ{2,3,4} vs baseline、
+    R²/MSE/複雑度/時間/成功率、多シード集計）。**NSN は feature_dim=4 が安定**（d=6 は exp/ln 発散）。
+    代表 5 式×深さ{2,3,4}×seed{0,1} 結果（`results/feynman_bench_20260713_053420/`）:
+    **MLP=EQL は成功率 1.00（R²≈0.999）、NSN は d2=0.40 / d3=0.00 / d4=0.10** と脆く、深いほど発散。
+    → 論文の優位性主張は**そのままでは再現できず**、式別チューニング or 専用ハード前提を示唆（④ D≥5 崩壊と整合）。
+    正直な負の実証結果として記録。
+- **変更ファイル**: `NSN/src/{cost,feynman,baselines,trainer}.py`,
+  `NSN/scripts/{flops_analysis,feynman_benchmark,sr_eval}.py`,
+  `NSN/tests/{test_cost,test_feynman}.py`, `NSN/texts/SR検証計画.md`, `NSN/daily_report.md`
+- **メモ**: pytest **50 件 PASS**。phase 3（zero, seed42, `results/sr_phase3_20260713_053541/`）は
+  `sum` 合格で **symbolic 5/6**。残る `sin_plus` は**シード敏感**（seed 1/7 で合格 0.01–0.03、seed 0/42/123 で
+  不合格 → 成功率 ~40%）。これは本環境（torch 2.13/py3.11）での NSN head の**数値的脆さ**を示し、
+  Feynman ベンチの負の結果と整合。以前の環境で sin_plus が合格していたのも同じ脆さの裏返し。
+
+## 2026-07-13 15:22
+
+- **作業内容**: TSTL 統合前の NSN ベースライン整備計画書を作成。ゲート条件（Phase 3 五式×5 seed で symbolic 80%、sin_plus は任意記録）、スコープ（Feynman/TSTL 本体は対象外）、実装ステップ（baseline_gate_eval、trunk 層 API、二段階学習オプション）を記載。ユーザー承諾後にコーディング開始。
+- **変更ファイル**: `NSN/texts/NSN整備計画_TSTL統合前.md`, `NSN/daily_report.md`
+- **メモ**: 承諾待ち。§10 のチェックリストにコメントいただくまで実装に入らない。
+
+## 2026-07-13 15:35
+
+- **作業内容**: §10 承諾を受け Step 1–3 を実装。`baseline_gate.py`（ゲート定義・判定）、`scripts/baseline_gate_eval.py`（多シード評価）、`trunk.py`（層凍結 API）、`pipeline.py`（`trunk_only_search`）、`trainer.py`（プロトコルフラグ伝播）。テスト 8 件追加。ルート `data/FeynmanEquations.csv` を計画書に追記。
+- **変更ファイル**: `NSN/src/{baseline_gate,trunk,pipeline,trainer}.py`, `NSN/scripts/baseline_gate_eval.py`, `NSN/tests/{test_baseline_gate,test_trunk_layers,test_pipeline}.py`, `NSN/texts/NSN整備計画_TSTL統合前.md`, `NSN/daily_report.md`
+- **メモ**: pytest 58 件 PASS（+8）。次: 本番ゲート実行（6式×5 seed、`baseline_gate_eval.py`）→ Gate 未達なら `freeze`/`trunk_first` フォールバック → `再現報告.md`。
+
+## 2026-07-13 18:05
+
+- **作業内容**: Step 4–5 完了。ベースラインゲート本番: `full` 30 run（43 min）Gate A FAIL / Gate C PASS。フォールバック `freeze`（5式×5）・`trunk_first`（5式×5）も Gate A 未達（trunk_first は 0%・Gate C も FAIL）。`NSN/texts/再現報告.md` 作成。推奨プロトコル `full`、TSTL は `exp`×seed{42,7} から層プロファイル着手可と記載。
+- **変更ファイル**: `NSN/texts/再現報告.md`, `NSN/texts/NSN整備計画_TSTL統合前.md`, `NSN/daily_report.md`
+- **結果**: `results/baseline_gate_20260713_160538/`（full）, `164957/`（freeze）, `172906/`（trunk_first）
+- **メモ**: Gate A 未達はシード 0/1 系統失敗と整合。`trunk_first` は不採用。
+
+## 2026-07-13 21:45
+
+- **作業内容**: Feynman CSV 全式ベンチ実装・実行。`feynman_csv.py`（CSV 読込・eval サンプル・1% ガウシアン誤差）、`feynman_csv_benchmark.py`（固定/ノイズ考慮の両 status、JSON+MD レポート）、`trainer._config_for_target` に phase=5 変数数帯 HP。テスト 5 件追加。全 99 式本番（124.5 min）: 固定 ok **0%**、ノイズ考慮 ok **5.1%**（eml-sr 9.1% / PySR 50–60% 未達）。
+- **変更ファイル**: `NSN/src/{feynman_csv,trainer}.py`, `NSN/scripts/feynman_csv_benchmark.py`, `NSN/tests/test_feynman_csv.py`, `NSN/texts/再現報告.md`, `NSN/daily_report.md`
+- **結果**: `results/feynman_csv_20260713_193755/`（pilot 10 式）, `results/feynman_csv_20260713_214242/`（full 99 式）
+- **メモ**: pytest **64 件 PASS**。次: SR 精度改善（depth sweep / trunk 容量）または TSTL 層プロファイル着手。

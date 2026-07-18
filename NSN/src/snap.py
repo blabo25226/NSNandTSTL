@@ -90,36 +90,68 @@ def evaluate_snapped(
     return mse, pred.detach()
 
 
-def _leaf_symbol_snapped(head: "EMLTreeHead", leaf_index: int, z_names: list[str]) -> str:
+def _leaf_alpha_or_beta(head: "EMLTreeHead", leaf_index: int, z_names: list[str]) -> str:
+    """Symbol for a leaf snapped to the alpha (constant) or beta (linear) branch."""
+    beta = head.beta[leaf_index]
+    terms = [
+        f"{beta[j].item():.6g}*{z_names[j]}"
+        for j in range(head.feature_dim)
+        if abs(beta[j].item()) > 1e-8
+    ]
+    if not terms:
+        return "0"
+    return "(" + " + ".join(terms) + ")"
+
+
+def _leaf_symbol_snapped(
+    head: "EMLTreeHead",
+    leaf_index: int,
+    z_names: list[str],
+    f_prev_pass: int = 0,
+) -> str:
+    """
+    Symbol of leaf `leaf_index` at recurrence pass `f_prev_pass`.
+
+    Mirrors `EMLTreeHead.leaf_values` under a one-hot (snapped) selection:
+      - alpha branch  -> constant string (pass-invariant).
+      - beta branch   -> linear-in-z string (pass-invariant).
+      - gamma branch  -> f_prev = parent EML node output. At pass 0 f_prev is the
+        constant `f_prev_const`; at pass t >= 1 it equals eml(sibling-pair symbols
+        evaluated at pass t-1), matching `_parent_outputs`.
+    """
     logits = head.effective_logits()[leaf_index]
     mode = int(logits.argmax().item())
     if mode == 0:
         return f"{head.alpha[leaf_index].item():.6g}"
     if mode == 1:
-        beta = head.beta[leaf_index]
-        terms = [
-            f"{beta[j].item():.6g}*{z_names[j]}"
-            for j in range(head.feature_dim)
-            if abs(beta[j].item()) > 1e-8
-        ]
-        if not terms:
-            return "0"
-        return "(" + " + ".join(terms) + ")"
-    return "f_prev"
+        return _leaf_alpha_or_beta(head, leaf_index, z_names)
+    # gamma / f_prev branch (only reachable in "parent" mode, where it is unmasked)
+    if f_prev_pass <= 0:
+        return f"{head.f_prev_const:.6g}"
+    k = leaf_index // 2
+    left = _leaf_symbol_snapped(head, 2 * k, z_names, f_prev_pass - 1)
+    right = _leaf_symbol_snapped(head, 2 * k + 1, z_names, f_prev_pass - 1)
+    return f"eml({left}, {right})"
 
 
 def export_symbolic_expression(head: "EMLTreeHead", z_names: list[str] | None = None) -> str:
     """
     Build nested eml(...) string from snapped (or nearly snapped) leaf logits.
 
-    Output form: Re[eml(...)] matching paper Eq. (10).
+    Output form: Re[eml(...)] matching paper Eq. (10). In "parent" f_prev mode the
+    gamma branch is expanded into the K-pass master-formula recurrence so the
+    exported closed form reproduces the snapped forward pass exactly.
     """
     if z_names is None:
         z_names = [f"z{i}" for i in range(head.feature_dim)]
     if len(z_names) != head.feature_dim:
         raise ValueError("z_names length must match feature_dim")
 
-    leaves = [_leaf_symbol_snapped(head, i, z_names) for i in range(head.num_leaves)]
+    final_pass = head.f_prev_passes if head.f_prev_mode == "parent" else 0
+    leaves = [
+        _leaf_symbol_snapped(head, i, z_names, final_pass)
+        for i in range(head.num_leaves)
+    ]
     level = leaves
     while len(level) > 1:
         next_level: list[str] = []

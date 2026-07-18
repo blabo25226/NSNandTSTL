@@ -28,6 +28,10 @@ class TrainConfig:
     leaf_softmax_mode: LeafSoftmaxMode | str = LeafSoftmaxMode.SOFTMAX
     use_odrzywolek_pipeline: bool = True
     polish_lr: float = 1e-4
+    f_prev_mode: str = "zero"
+    f_prev_passes: int = 1
+    freeze_trunk_after_search: bool = False
+    trunk_only_search: bool = False
 
 
 @dataclass
@@ -50,7 +54,15 @@ class TrainResult:
 
 def _config_for_target(target: SRTarget, base: TrainConfig) -> TrainConfig:
     cfg = TrainConfig(**vars(base))
-    if target.id == "sin_plus":
+    if target.id == "sum":
+        cfg.feature_dim = 6
+        # D=3 gives the EML tree enough capacity to represent the linear sum
+        # (D=2 plateaus ~0.03-0.4); parent-mode f_prev feedback is numerically
+        # unstable and does not help, so depth is the stable lever.
+        cfg.head_depth = 3
+        cfg.steps = 6000
+        cfg.lr = 2e-3
+    elif target.id == "sin_plus":
         cfg.feature_dim = 8
         cfg.head_depth = 2
         cfg.steps = 6000
@@ -80,6 +92,25 @@ def _config_for_target(target: SRTarget, base: TrainConfig) -> TrainConfig:
         cfg.feature_dim = 6
         cfg.head_depth = 2
         cfg.steps = 5000
+        cfg.lr = 2e-3
+    elif target.phase == 5:
+        # Full Feynman CSV benchmark (variable-count bands).
+        if target.input_dim == 1:
+            cfg.feature_dim = 4
+            cfg.head_depth = 2
+            cfg.steps = 5000
+        elif target.input_dim == 2:
+            cfg.feature_dim = 4
+            cfg.head_depth = 2
+            cfg.steps = 5000
+        elif target.input_dim == 3:
+            cfg.feature_dim = 6
+            cfg.head_depth = 2
+            cfg.steps = 6000
+        else:
+            cfg.feature_dim = 6
+            cfg.head_depth = 3
+            cfg.steps = 8000
         cfg.lr = 2e-3
     elif target.input_dim == 1:
         cfg.feature_dim = 4
@@ -117,6 +148,8 @@ def train_target(target: SRTarget, base_config: TrainConfig | None = None) -> tu
         hidden_dim=cfg.hidden_dim,
         num_layers=cfg.num_layers,
         leaf_softmax_mode=leaf_mode,
+        f_prev_mode=cfg.f_prev_mode,
+        f_prev_passes=cfg.f_prev_passes,
     )
 
     if cfg.use_odrzywolek_pipeline:
@@ -127,6 +160,8 @@ def train_target(target: SRTarget, base_config: TrainConfig | None = None) -> tu
             weight_decay=cfg.weight_decay,
             leaf_softmax_mode=leaf_mode,
             seed=cfg.seed,
+            freeze_trunk_after_search=cfg.freeze_trunk_after_search,
+            trunk_only_search=cfg.trunk_only_search,
         )
         pipe = run_odrzywolek_pipeline(model, x, y, pipe_cfg)
         elapsed = time.perf_counter() - t0

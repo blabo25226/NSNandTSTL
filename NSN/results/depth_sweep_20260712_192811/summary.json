@@ -1,0 +1,229 @@
+{
+  "depths": [
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "seeds": [
+    0,
+    1
+  ],
+  "steps": 1000,
+  "success_threshold": 0.05,
+  "per_depth": {
+    "2": {
+      "runs": 4,
+      "success_rate": 0.0,
+      "finite_rate": 1.0,
+      "median_snapped_mse": 2.8132834434509277
+    },
+    "3": {
+      "runs": 4,
+      "success_rate": 0.5,
+      "finite_rate": 1.0,
+      "median_snapped_mse": 0.8023527269251645
+    },
+    "4": {
+      "runs": 4,
+      "success_rate": 0.0,
+      "finite_rate": 1.0,
+      "median_snapped_mse": 1.3729207632789504e+17
+    },
+    "5": {
+      "runs": 4,
+      "success_rate": 0.0,
+      "finite_rate": 0.5,
+      "median_snapped_mse": 204.4295654296875
+    },
+    "6": {
+      "runs": 4,
+      "success_rate": 0.0,
+      "finite_rate": 0.25,
+      "median_snapped_mse": 3.919893385497805e+16
+    }
+  },
+  "results": [
+    {
+      "target_id": "sin",
+      "depth": 2,
+      "seed": 0,
+      "finite": true,
+      "soft_holdout_mse": 2.0041465759277344,
+      "snapped_holdout_mse": 2.0041465759277344,
+      "success": false
+    },
+    {
+      "target_id": "sin",
+      "depth": 2,
+      "seed": 1,
+      "finite": true,
+      "soft_holdout_mse": 2.1374475955963135,
+      "snapped_holdout_mse": 2.1374475955963135,
+      "success": false
+    },
+    {
+      "target_id": "sin",
+      "depth": 3,
+      "seed": 0,
+      "finite": true,
+      "soft_holdout_mse": 1.6013377904891968,
+      "snapped_holdout_mse": 1.6013377904891968,
+      "success": false
+    },
+    {
+      "target_id": "sin",
+      "depth": 3,
+      "seed": 1,
+      "finite": true,
+      "soft_holdout_mse": 0.0011284956708550453,
+      "snapped_holdout_mse": 0.0011284956708550453,
+      "success": true
+    },
+    {
+      "target_id": "sin",
+      "depth": 4,
+      "seed": 0,
+      "finite": true,
+      "soft_holdout_mse": 2.3538521880081203e+17,
+      "snapped_holdout_mse": 2.3538521880081203e+17,
+      "success": false
+    },
+    {
+      "target_id": "sin",
+      "depth": 4,
+      "seed": 1,
+      "finite": true,
+      "soft_holdout_mse": 1206999056384.0,
+      "snapped_holdout_mse": 1206999056384.0,
+      "success": false
+    },
+    {
+      "target_id": "sin",
+      "depth": 5,
+      "seed": 0,
+      "finite": true,
+      "soft_holdout_mse": 400.4634094238281,
+      "snapped_holdout_mse": 400.4634094238281,
+      "success": false
+    },
+    {
+      "target_id": "sin",
+      "depth": 5,
+      "seed": 1,
+      "finite": false,
+      "soft_holdout_mse": Infinity,
+      "snapped_holdout_mse": Infinity,
+      "success": false
+    },
+    {
+      "target_id": "sin",
+      "depth": 6,
+      "seed": 0,
+      "finite": true,
+      "soft_holdout_mse": 3.919893385497805e+16,
+      "snapped_holdout_mse": 3.919893385497805e+16,
+      "success": false
+    },
+    {
+      "target_id": "sin",
+      "depth": 6,
+      "seed": 1,
+      "finite": false,
+      "soft_holdout_mse": Infinity,
+      "snapped_holdout_mse": Infinity,
+      "success": false
+    },
+    {
+      "target_id": "product",
+      "depth": 2,
+      "seed": 0,
+      "finite": true,
+      "soft_holdout_mse": 5.279720783233643,
+      "snapped_holdout_mse": 5.279720783233643,
+      "success": false
+    },
+    {
+      "target_id": "product",
+      "depth": 2,
+      "seed": 1,
+      "finite": true,
+      "soft_holdout_mse": 3.489119291305542,
+      "snapped_holdout_mse": 3.489119291305542,
+      "success": false
+    },
+    {
+      "target_id": "product",
+      "depth": 3,
+      "seed": 0,
+      "finite": true,
+      "soft_holdout_mse": 0.003367663361132145,
+      "snapped_holdout_mse": 0.003367663361132145,
+      "success": true
+    },
+    {
+      "target_id": "product",
+      "depth": 3,
+      "seed": 1,
+      "finite": true,
+      "soft_holdout_mse": 5.930308818817139,
+      "snapped_holdout_mse": 5.930308818817139,
+      "success": false
+    },
+    {
+      "target_id": "product",
+      "depth": 4,
+      "seed": 0,
+      "finite": true,
+      "soft_holdout_mse": 3.919893385497805e+16,
+      "snapped_holdout_mse": 3.919893385497805e+16,
+      "success": false
+    },
+    {
+      "target_id": "product",
+      "depth": 4,
+      "seed": 1,
+      "finite": true,
+      "soft_holdout_mse": 2.353852531605504e+17,
+      "snapped_holdout_mse": 2.353852531605504e+17,
+      "success": false
+    },
+    {
+      "target_id": "product",
+      "depth": 5,
+      "seed": 0,
+      "finite": true,
+      "soft_holdout_mse": 8.395721435546875,
+      "snapped_holdout_mse": 8.395721435546875,
+      "success": false
+    },
+    {
+      "target_id": "product",
+      "depth": 5,
+      "seed": 1,
+      "finite": false,
+      "soft_holdout_mse": Infinity,
+      "snapped_holdout_mse": Infinity,
+      "success": false
+    },
+    {
+      "target_id": "product",
+      "depth": 6,
+      "seed": 0,
+      "finite": false,
+      "soft_holdout_mse": Infinity,
+      "snapped_holdout_mse": Infinity,
+      "success": false
+    },
+    {
+      "target_id": "product",
+      "depth": 6,
+      "seed": 1,
+      "finite": false,
+      "soft_holdout_mse": Infinity,
+      "snapped_holdout_mse": Infinity,
+      "success": false
+    }
+  ]
+}

@@ -36,6 +36,8 @@ class OdrzywolekPipelineConfig:
     # Head-capacity study: freeze the trunk after SEARCH so the EML head must
     # carry the symbolic load during HARDEN/POLISH instead of the black-box MLP.
     freeze_trunk_after_search: bool = False
+    # SEARCH trains trunk only; HARDEN/POLISH train head only (trunk frozen).
+    trunk_only_search: bool = False
     # Snap-aware POLISH: commit the discrete leaf choices (argmax -> one-hot)
     # *before* polishing, so the continuous params (alpha/beta/trunk) are fit to
     # the exact discrete tree that will be exported. This makes the snapped
@@ -79,6 +81,21 @@ def _set_head_mode(head, mode: LeafSoftmaxMode, gen: torch.Generator) -> None:
     head.gumbel_generator = gen
 
 
+def _set_requires_grad(module: torch.nn.Module, flag: bool) -> None:
+    for p in module.parameters():
+        p.requires_grad_(flag)
+
+
+def _trainable_params(model: DNNEML) -> list[torch.nn.Parameter]:
+    return [p for p in model.parameters() if p.requires_grad]
+
+
+def _make_optimizer(
+    model: DNNEML, lr: float, weight_decay: float
+) -> torch.optim.AdamW:
+    return torch.optim.AdamW(_trainable_params(model), lr=lr, weight_decay=weight_decay)
+
+
 def _train_step(model: DNNEML, x: torch.Tensor, y: torch.Tensor, opt: torch.optim.Optimizer) -> float:
     opt.zero_grad()
     loss = model.mse_loss(x, y)
@@ -109,7 +126,10 @@ def run_odrzywolek_pipeline(
     head = model.head
     _set_head_mode(head, cfg.leaf_softmax_mode, gen)
 
-    opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    if cfg.trunk_only_search:
+        _set_requires_grad(model.trunk, True)
+        _set_requires_grad(model.head, False)
+    opt = _make_optimizer(model, cfg.lr, cfg.weight_decay)
 
     # --- SEARCH ---
     head.set_temperature(1.0)
@@ -117,14 +137,13 @@ def run_odrzywolek_pipeline(
         model.train()
         stages.search_losses.append(_train_step(model, x, y, opt))
 
-    if cfg.freeze_trunk_after_search:
-        for p in model.trunk.parameters():
-            p.requires_grad_(False)
-        opt = torch.optim.AdamW(
-            [p for p in model.parameters() if p.requires_grad],
-            lr=cfg.lr,
-            weight_decay=cfg.weight_decay,
-        )
+    if cfg.trunk_only_search:
+        _set_requires_grad(model.trunk, False)
+        _set_requires_grad(model.head, True)
+        opt = _make_optimizer(model, cfg.lr, cfg.weight_decay)
+    elif cfg.freeze_trunk_after_search:
+        _set_requires_grad(model.trunk, False)
+        opt = _make_optimizer(model, cfg.lr, cfg.weight_decay)
 
     # --- HARDEN ---
     for step in range(1, harden_n + 1):
@@ -147,16 +166,18 @@ def run_odrzywolek_pipeline(
         p for n, p in model.named_parameters()
         if "leaf_logits" not in n and p.requires_grad
     ]
-    polish_opt = torch.optim.AdamW(polish_params, lr=cfg.polish_lr, weight_decay=cfg.weight_decay)
+    polish_opt = torch.optim.AdamW(
+        polish_params, lr=cfg.polish_lr, weight_decay=cfg.weight_decay
+    )
     head.set_temperature(cfg.harden_end_temp)
     for _ in range(polish_n):
         model.train()
         stages.polish_losses.append(_train_step(model, x, y, polish_opt))
 
     head.leaf_logits.requires_grad_(True)
-    if cfg.freeze_trunk_after_search:
-        for p in model.trunk.parameters():
-            p.requires_grad_(True)
+    if cfg.freeze_trunk_after_search or cfg.trunk_only_search:
+        _set_requires_grad(model.trunk, True)
+        _set_requires_grad(model.head, True)
     all_losses = stages.search_losses + stages.harden_losses + stages.polish_losses
 
     # --- SNAP (export + faithfulness measurement) ---

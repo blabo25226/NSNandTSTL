@@ -65,6 +65,18 @@ def main() -> None:
         default="softmax",
         help="Leaf weight sampling during SEARCH/HARDEN (gumbel adds stochastic exploration).",
     )
+    parser.add_argument(
+        "--f-prev-mode",
+        choices=["zero", "parent"],
+        default="zero",
+        help="f_prev master-formula mode. 'parent' enables gamma feedback (K passes).",
+    )
+    parser.add_argument(
+        "--f-prev-passes",
+        type=int,
+        default=1,
+        help="Number of Jacobi passes for f_prev in parent mode (K).",
+    )
     args = parser.parse_args()
 
     mse_strict = args.mse_strict
@@ -91,14 +103,32 @@ def main() -> None:
         )
         print(f"\n[{tid}] true={target.formula} monotonic={target.monotonic} thr={thr:.2e}")
 
-        model, tr = train_target(
-            target,
-            TrainConfig(
-                seed=args.seed,
-                noise_std_rel=noise_std_rel,
-                leaf_softmax_mode=leaf_softmax,
-            ),
-        )
+        try:
+            model, tr = train_target(
+                target,
+                TrainConfig(
+                    seed=args.seed,
+                    noise_std_rel=noise_std_rel,
+                    leaf_softmax_mode=leaf_softmax,
+                    f_prev_mode=args.f_prev_mode,
+                    f_prev_passes=args.f_prev_passes,
+                ),
+            )
+        except (RuntimeError, ValueError) as exc:
+            # e.g. NaN loss (parent-mode f_prev can diverge); record as a failure
+            # instead of aborting the whole phase.
+            print(f"  training failed: {exc}")
+            rows.append({
+                "target_id": tid, "true_formula": target.formula,
+                "monotonic": target.monotonic, "holdout_mse": float("inf"),
+                "snapped_holdout_mse": float("inf"), "snap_degrade_ratio": float("nan"),
+                "mse_threshold": thr, "numeric_ok": False, "symbolic_ok": False,
+                "template_guess": None, "template_mse": None,
+                "eml_expression": None, "simplified": None, "steps": 0,
+                "train_seconds": 0.0, "best_val_mse": float("inf"), "stopped_step": 0,
+                "error": str(exc),
+            })
+            continue
         total_train_sec += tr.train_seconds
         gen = torch.Generator().manual_seed(args.seed + 1)
         x_hold, y_hold = target.sample(128, gen, noise_std_rel)
